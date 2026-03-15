@@ -1,6 +1,6 @@
 Installation:
 
-1. Open the file plugins.ini located in the following directory: `\cstrike\addons\amxmodx\configs`
+1. Open the file `plugins.ini` located in the following directory: `\cstrike\addons\amxmodx\configs\`
 
 2. Add the following line to the file: `distance_prediction.amxx`
 
