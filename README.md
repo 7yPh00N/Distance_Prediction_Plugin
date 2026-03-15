@@ -4,4 +4,4 @@ Installation:
 
 3. Add the following line to the file: `distance_prediction.amxx`
 
-4. Save the file and restart your game.
+4. Save the file and restart your game
