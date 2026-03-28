@@ -7,7 +7,7 @@ new const PLUGIN_AUTHOR[] = "7yPh00N"
 
 new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
-new const Float:BJ_JUMP_TIME  = 0.65389425396792266731 // kz_longjumps2
+new const Float:BJ_JUMP_TIME = 0.65389425396792266731 // kz_longjumps2
 
 new const g_ColorNames[8][] = { "Yellow", "Orange", "Red", "Green", "Blue", "Cyan", "Pink", "White" }
 new const g_ColorValues[8][3] = {
@@ -46,8 +46,8 @@ public plugin_init()
     
     LoadSettings()
     
-    register_clcmd("say /predmenu", "cmd_predmenu")
-    register_clcmd("say_team /predmenu", "cmd_predmenu")
+    register_clcmd("say /dps", "cmd_predmenu")
+    register_clcmd("say_team /dps", "cmd_predmenu")
     
     // Main Menu
     register_menucmd(register_menuid(MENU_MAIN), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<9), "handle_predmenu")
@@ -82,7 +82,7 @@ public cmd_predmenu(id)
 stock show_predmenu(id)
 {
     new text[512]
-    formatex(text, charsmax(text), "\rDistance Prediction Menu^n^n")
+    formatex(text, charsmax(text), "\rDistance Prediction Settings^n^n")
     formatex(text, charsmax(text), "%s\yMade by 7yPh00N^n^n", text)
     if (g_Enabled)
         formatex(text, charsmax(text), "%s\r1. \wEnable Plugin - \yON^n", text)
@@ -134,7 +134,7 @@ stock show_jumptypemenu(id)
     formatex(text, charsmax(text), "%s\r3. \wBhop Jump%s^n^n", 
          text, curr_type == 3 ? " \y[Current]" : "")
     formatex(text, charsmax(text), "%s\r4. \ySave Settings^n^n", text)
-    formatex(text, charsmax(text), "%s\r0. \wBack to Main Menu", text)
+    formatex(text, charsmax(text), "%s\r0. \wBack", text)
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<9), text, -1, MENU_JUMPTYPE)
 }
 
@@ -166,7 +166,7 @@ stock show_colormenu(id)
                  is_current ? " \y[Current]" : "")
     }
     formatex(text, charsmax(text), "%s^n\r9. \ySave Settings^n^n", text)
-    formatex(text, charsmax(text), "%s\r0. \wBack to Main Menu", text)
+    formatex(text, charsmax(text), "%s\r0. \wBack", text)
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), text, -1, MENU_COLOR)
 }
 
@@ -204,7 +204,7 @@ stock show_realtime_ymenu(id)
     formatex(text, charsmax(text), "%s\r3. \wY + 0.01 (Down)^n", text)
     formatex(text, charsmax(text), "%s\r4. \yY = Center^n^n", text)
     formatex(text, charsmax(text), "%s\r5. \ySave Settings^n^n", text)
-    formatex(text, charsmax(text), "%s\r0. \wBack to Main Menu", text)
+    formatex(text, charsmax(text), "%s\r0. \wBack", text)
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<9), text, -1, MENU_REALTIME_Y)
 }
 
@@ -269,7 +269,7 @@ stock show_stats_pos_menu(id)
     formatex(text, charsmax(text), "%s\r7. \yY = Center^n^n", text)
     formatex(text, charsmax(text), "%s\r8. \yDefault Position (X = Center, Y = 0.25)^n^n", text)
     formatex(text, charsmax(text), "%s\r9. \ySave Settings^n^n", text)
-    formatex(text, charsmax(text), "%s\r0. \wBack to Main Menu", text)
+    formatex(text, charsmax(text), "%s\r0. \wBack", text)
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), text, -1, MENU_STATS_POS)
 }
 
