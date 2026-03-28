@@ -1,6 +1,6 @@
 Installation:
 
-1. Extract the `cstrike` folder from the zip file into the game's root directory: `\Half-Life\`
+1. Extract the `cstrike` folder from the zip file into your game's root directory: `\Half-Life\`
 
 2. Open the file `plugins.ini` located in the following directory: `\cstrike\addons\amxmodx\configs\`
 
