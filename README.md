@@ -2,7 +2,7 @@
 
 1. Extract the `cstrike` folder from the zip file to your game's root directory: `\Half-Life\`
 
-2. Open the file `plugins.ini` located at: `\cstrike\addons\amxmodx\configs\`
+2. Open the `plugins.ini` file located in: `\cstrike\addons\amxmodx\configs\`
 
 3. Add the following line to the file: `distance_prediction.amxx`
 
@@ -30,7 +30,7 @@
 
 1. Added best predicted distance statistics feature
 
-2. Improved jump start time detection method
+2. Improved jump start time detection logic
 
 ## [V1.0.0] 2026.03.15
 
