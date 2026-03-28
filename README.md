@@ -2,7 +2,7 @@
 
 1. Extract the `cstrike` folder from the zip file to your game's root directory: `\Half-Life\`
 
-2. Open the file `plugins.ini` which is located in: `\cstrike\addons\amxmodx\configs\`
+2. Open the file `plugins.ini` located at: `\cstrike\addons\amxmodx\configs\`
 
 3. Add the following line to the file: `distance_prediction.amxx`
 
@@ -34,5 +34,5 @@
 
 ## [V1.0.0] 2026.03.15
 
-1. Added distance prediction & real-time display feature
+1. Added distance prediction & real-time display features
 
