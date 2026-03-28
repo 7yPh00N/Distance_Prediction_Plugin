@@ -10,7 +10,7 @@
 
 # Command
 
-`/dps` - Plugin settings menu
+1. `/dps` - Plugin settings menu
 
 # Changelog
 
@@ -30,7 +30,7 @@
 
 1. Added best predicted distance statistics feature
 
-2. Improved jump start time detection function
+2. Improved jump start time detection method
 
 ## [V1.0.0] 2026.03.15
 
