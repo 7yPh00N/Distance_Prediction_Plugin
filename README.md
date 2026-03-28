@@ -35,3 +35,4 @@
 ## [V1.0.0] 2026.03.15
 
 1. Added distance prediction & real-time display feature
+
