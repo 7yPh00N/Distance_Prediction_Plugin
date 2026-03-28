@@ -18,9 +18,9 @@
 
 1. Added plugin settings menu (`/dps`)
 
-2. Added plugin `ON/OFF` feature
+2. Added `SBJ` & `BJ` (jump types)
 
-3. Added SBJ & BJ (jump types)
+3. Added plugin `ON`/`OFF` feature
 
 4. Added HUD color selection feature
 
