@@ -1,6 +1,6 @@
 # Installation
 
-1. Extract the `cstrike` folder from the zip file to your game's root directory: `\Half-Life\`
+1. Extract the `cstrike` folder from the ZIP file into your game's root directory (usually: `\Half-Life\`)
 
 2. Open the `plugins.ini` file located in: `\cstrike\addons\amxmodx\configs\`
 
@@ -14,11 +14,13 @@
 
 # Changelog
 
-## [V1.1.0] 2026.03.28
+## V1.1.0 
+
+### 2026.03.28
 
 1. Added plugin settings menu (`/dps`)
 
-2. Added plugin `ON`/`OFF` feature
+2. Added plugin toggle (`ON`/`OFF`)
 
 3. Added `SBJ` & `BJ` (jump types)
 
@@ -26,13 +28,17 @@
 
 5. Added HUD position adjustment feature
 
-## [V1.0.5_beta] 2026.03.24
+## V1.0.5_beta 
+### 2026.03.24
 
 1. Added best predicted distance statistics feature
 
-2. Improved jump start time detection logic
+2. Improved detection logic for jump start time
 
-## [V1.0.0] 2026.03.15
+## V1.0.0
+### 2026.03.15
 
-1. Added distance prediction & real-time display features
+1. Added `LJ/HJ/WJ/CJ/DCJ/SCJ` distance prediction feature
+
+2. Added real-time display feature
 
