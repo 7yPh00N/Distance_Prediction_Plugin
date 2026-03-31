@@ -14,6 +14,12 @@
 
 # Changelog
 
+## V1.1.5_beta
+
+### 2026.03.31
+
+1. Added landing area prediction feature
+
 ## V1.1.0 
 
 ### 2026.03.28
