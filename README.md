@@ -20,11 +20,13 @@
 
 1. Improved landing area prediction feature
 
+- Added toggle (`ON`/`OFF`)
+
 - Added rectangle color selection feature
 
 - Fixed some bugs
 
-2. Added real-time display hold time adjustment feature
+2. Added hold time adjustment feature
 
 ## V1.1.5_beta
 
@@ -58,5 +60,4 @@
 
 1. Added `LJ/HJ/WJ/CJ/DCJ/SCJ` distance prediction feature
 
-2. Added real-time display feature
-
+- Added real-time display feature
