@@ -22,11 +22,13 @@
 
 - Added toggle (`ON`/`OFF`)
 
-- Added rectangle color selection feature
+- Added color selection feature
 
 - Fixed some bugs
+  
+2. Improved distance prediction feature
 
-2. Added hold time adjustment feature
+- Added hold time adjustment feature
 
 ## V1.1.5_beta
 
