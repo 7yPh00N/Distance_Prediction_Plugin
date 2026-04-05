@@ -26,7 +26,7 @@
 
 - Fixed some bugs
   
-2. Improved distance prediction feature
+2. Improved real-time display feature (distance prediction)
 
 - Added hold time adjustment feature
 
