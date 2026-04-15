@@ -8,11 +8,22 @@
 
 4. Save the file and restart your game
 
-# Command
+# Commands
 
-1. `/dps` - Plugin settings menu
+- `/dps` - Plugin settings menu
+- `/distpred` - Enable / Disable Plugin
 
 # Changelog
+
+## V1.3.0
+
+### 2026.04.15
+
+1. Added sonar feature
+
+2. Added many new commands
+
+3. Refactored config file read & write methods
 
 ## V1.2.0
 
