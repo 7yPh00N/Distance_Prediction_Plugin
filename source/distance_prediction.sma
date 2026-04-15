@@ -2,7 +2,7 @@
 #include <fakemeta>
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.2.0"
+new const PLUGIN_VERSION[] = "1.3.0"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 
 new const Float:LJ_JUMP_TIME = 0.73227289328465705598
@@ -18,19 +18,19 @@ new const g_ColorValues[8][3] = {
 new bool:g_Enabled = true
 new bool:g_ShowRealTime = true
 new bool:g_ShowBest = true
+new bool:g_SonarEnabled = true
 new Float:g_JumpTime
 new g_HudR = 255, g_HudG = 255, g_HudB = 0
 new Float:g_RealTimeY = -1.0
 new Float:g_RealTimeHoldTime = 0.011
 new Float:g_StatsX = -1.0
 new Float:g_StatsY = 0.25
-
 new bool:g_LandingEnabled
 new g_SuccessRectIndex
 new g_FailRectIndex
-
 new g_ColorTarget
 
+new g_JumpTypeIndex = 1
 new Float:g_JumpStartTime[33]
 new Float:g_JumpStartOrigin[33][3]
 new Float:g_GroundZ[33]
@@ -44,10 +44,16 @@ new bool:g_UseUpperRect[33]
 new Float:g_PredX[33]
 new Float:g_PredY[33]
 new Float:g_PredZ[33]
-
 new bool:g_PreJumpActive[33]
 new Float:g_PreJumpTime[33]
 new Float:g_PreJumpGroundZ[33]
+new g_ThresholdReached[33]
+new g_FlashFrames[33]
+
+new Float:g_Thresholds[4][32]
+new g_ThresholdCounts[4]
+new Float:g_CurrentThresholds[32]
+new g_CurrentThresholdCount
 
 new g_BeamSprite
 
@@ -61,26 +67,145 @@ new const MENU_LANDING[] = "LandingAreaMenu"
 public plugin_precache()
 {
     g_BeamSprite = precache_model("sprites/laserbeam.spr")
+    precache_generic("sound/7yPh00N/blip1.wav")
+    precache_sound("7yPh00N/blip1.wav")
 }
 
 public plugin_init()
 {
     register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
     register_forward(FM_PlayerPreThink, "fw_PlayerPreThink")
-   
     LoadSettings()
-   
     register_clcmd("say /dps", "cmd_predmenu")
     register_clcmd("say_team /dps", "cmd_predmenu")
     register_clcmd("say dps", "cmd_predmenu")
     register_clcmd("say_team dps", "cmd_predmenu")
-   
-    register_menucmd(register_menuid(MENU_MAIN), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<9), "handle_predmenu")
-    register_menucmd(register_menuid(MENU_JUMPTYPE), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<9), "handle_jumptype")
+    register_clcmd("say /ljpred", "cmd_set_lj")
+    register_clcmd("say /hjpred", "cmd_set_lj")
+    register_clcmd("say /cjpred", "cmd_set_cj")
+    register_clcmd("say /scjpred", "cmd_set_cj")
+    register_clcmd("say /dcjpred", "cmd_set_dcj")
+    register_clcmd("say /wjpred", "cmd_set_dcj")
+    register_clcmd("say /sbjpred", "cmd_set_sbj")
+    register_clcmd("say /bjpred", "cmd_set_bj")
+    register_clcmd("say /rtpredhud", "cmd_toggle_realtime")
+    register_clcmd("say /bestpredhud", "cmd_toggle_best")
+    register_clcmd("say /landingpred", "cmd_toggle_landing")
+    register_clcmd("say /distpred", "cmd_toggle_enabled")
+    register_clcmd("say /sonar", "cmd_toggle_sonar")
+    register_menucmd(register_menuid(MENU_MAIN), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_predmenu")
+    register_menucmd(register_menuid(MENU_JUMPTYPE), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<9), "handle_jumptype")
     register_menucmd(register_menuid(MENU_COLOR), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_colormenu")
     register_menucmd(register_menuid(MENU_REALTIME_Y), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_realtime_y")
     register_menucmd(register_menuid(MENU_STATS_POS), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_stats_pos")
     register_menucmd(register_menuid(MENU_LANDING), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<9), "handle_landingmenu")
+}
+
+stock UpdateCurrentThresholds()
+{
+    new type
+    switch (g_JumpTypeIndex)
+    {
+        case 1: type = 0   // LJ / HJ
+        case 2: type = 1   // CJ / SCJ
+        case 3: type = 2   // DCJ / WJ
+        default: type = 3  // SBJ / BJ
+    }
+    g_CurrentThresholdCount = g_ThresholdCounts[type]
+    for (new i = 0; i < g_CurrentThresholdCount; i++)
+        g_CurrentThresholds[i] = g_Thresholds[type][i]
+}
+
+public cmd_set_lj(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_JumpTypeIndex = 1;
+    g_JumpTime = LJ_JUMP_TIME;
+    UpdateCurrentThresholds();
+    client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3LJ / HJ");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_set_cj(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_JumpTypeIndex = 2;
+    g_JumpTime = LJ_JUMP_TIME;
+    UpdateCurrentThresholds();
+    client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3CJ / SCJ");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_set_dcj(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_JumpTypeIndex = 3;
+    g_JumpTime = LJ_JUMP_TIME;
+    UpdateCurrentThresholds();
+    client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3DCJ / WJ");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_set_sbj(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_JumpTypeIndex = 4;
+    g_JumpTime = SBJ_JUMP_TIME;
+    UpdateCurrentThresholds();
+    client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3SBJ");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_set_bj(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_JumpTypeIndex = 5;
+    g_JumpTime = BJ_JUMP_TIME;
+    UpdateCurrentThresholds();
+    client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3BJ");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+
+public cmd_toggle_realtime(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_ShowRealTime = !g_ShowRealTime;
+    client_print_color(id, id, "^4[7yPh00N]^1 Real-Time Prediction: %s", g_ShowRealTime ? "^3ON" : "^3OFF");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_toggle_best(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_ShowBest = !g_ShowBest;
+    client_print_color(id, id, "^4[7yPh00N]^1 Best Predicted Distance: %s", g_ShowBest ? "^3ON" : "^3OFF");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_toggle_landing(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_LandingEnabled = !g_LandingEnabled;
+    client_print_color(id, id, "^4[7yPh00N]^1 Landing Area Prediction: %s", g_LandingEnabled ? "^3ON" : "^3OFF");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_toggle_enabled(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_Enabled = !g_Enabled;
+    client_print_color(id, id, "^4[7yPh00N]^1 Distance Prediction Plugin: %s", g_Enabled ? "^3ON" : "^3OFF");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
+}
+public cmd_toggle_sonar(id)
+{
+    if (!is_user_connected(id)) return PLUGIN_HANDLED;
+    g_SonarEnabled = !g_SonarEnabled;
+    client_print_color(id, id, "^4[7yPh00N]^1 Sonar: %s", g_SonarEnabled ? "^3ON" : "^3OFF");
+    SaveSettings(id);
+    return PLUGIN_HANDLED;
 }
 
 public client_connect(id)
@@ -98,6 +223,8 @@ public client_connect(id)
     g_PreJumpActive[id] = false
     g_PreJumpTime[id] = 0.0
     g_PreJumpGroundZ[id] = 0.0
+    g_ThresholdReached[id] = 0
+    g_FlashFrames[id] = 0
     for(new i = 0; i < 32; i++)
         g_StrafeMaxDistance[id][i] = 0.0
 }
@@ -118,35 +245,34 @@ stock show_predmenu(id)
         formatex(text, charsmax(text), "%s\r1. \wEnable Plugin - \yON^n", text)
     else
         formatex(text, charsmax(text), "%s\r1. \wEnable Plugin - \rOFF^n", text)
-    formatex(text, charsmax(text), "%s\r2. \wJump Type^n", text)
-    formatex(text, charsmax(text), "%s\r3. \wHUD Color^n", text)
-    formatex(text, charsmax(text), "%s\r4. \wReal-Time Prediction^n", text)
-    formatex(text, charsmax(text), "%s\r5. \wBest Predicted Distance^n", text)
-    formatex(text, charsmax(text), "%s\r6. \wLanding Area Prediction^n^n", text)
-    formatex(text, charsmax(text), "%s\r7. \ySave Settings^n^n", text)
+  
+    if (g_SonarEnabled)
+        formatex(text, charsmax(text), "%s\r2. \wEnable Sonar - \yON^n", text)
+    else
+        formatex(text, charsmax(text), "%s\r2. \wEnable Sonar - \rOFF^n", text)
+  
+    formatex(text, charsmax(text), "%s\r3. \wJump Type^n", text)
+    formatex(text, charsmax(text), "%s\r4. \wHUD Color^n", text)
+    formatex(text, charsmax(text), "%s\r5. \wReal-Time Prediction^n", text)
+    formatex(text, charsmax(text), "%s\r6. \wBest Predicted Distance^n", text)
+    formatex(text, charsmax(text), "%s\r7. \wLanding Area Prediction^n^n", text)
+    formatex(text, charsmax(text), "%s\r8. \ySave Settings^n^n", text)
     formatex(text, charsmax(text), "%s\r0. \wExit", text)
-    show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<9), text, -1, MENU_MAIN)
+    show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), text, -1, MENU_MAIN)
 }
 
 public handle_predmenu(id, key)
 {
     switch (key)
     {
-        case 0:
-        {
-            g_Enabled = !g_Enabled;
-            show_predmenu(id);
-        }
-        case 1: show_jumptypemenu(id)
-        case 2: 
-        {
-            g_ColorTarget = 0;
-            show_colormenu(id, 0);
-        }
-        case 3: show_realtime_ymenu(id)
-        case 4: show_stats_pos_menu(id)
-        case 5: show_landingmenu(id)
-        case 6: { SaveSettings(id); show_predmenu(id); }
+        case 0: { g_Enabled = !g_Enabled; show_predmenu(id); }
+        case 1: { g_SonarEnabled = !g_SonarEnabled; show_predmenu(id); }
+        case 2: show_jumptypemenu(id)
+        case 3: { g_ColorTarget = 0; show_colormenu(id, 0); }
+        case 4: show_realtime_ymenu(id)
+        case 5: show_stats_pos_menu(id)
+        case 6: show_landingmenu(id)
+        case 7: { SaveSettings(id); show_predmenu(id); }
         case 9: return
     }
 }
@@ -159,82 +285,55 @@ stock show_landingmenu(id)
         formatex(text, charsmax(text), "%s\r1. \wEnable Landing Area Prediction - \yON^n^n", text)
     else
         formatex(text, charsmax(text), "%s\r1. \wEnable Landing Area Prediction - \rOFF^n^n", text)
-    
+ 
     formatex(text, charsmax(text), "%s\r2. \wColor 01 - %s%s^n", text, g_LandingEnabled ? "\y" : "\r", g_ColorNames[g_SuccessRectIndex])
     formatex(text, charsmax(text), "%s\r3. \wColor 02 - %s%s^n^n", text, g_LandingEnabled ? "\y" : "\r", g_ColorNames[g_FailRectIndex])
     formatex(text, charsmax(text), "%s\r4. \ySave Settings^n^n", text)
     formatex(text, charsmax(text), "%s\r0. \wBack", text)
-    
+ 
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<9), text, -1, MENU_LANDING)
 }
 
 public handle_landingmenu(id, key)
 {
-    if (key == 9) 
-    { 
-        show_predmenu(id); 
-        return; 
-    }
-   
+    if (key == 9) { show_predmenu(id); return; }
     switch (key)
     {
-        case 0:
-        {
-            g_LandingEnabled = !g_LandingEnabled;
-            show_landingmenu(id);
-        }
-        case 1: 
-        {
-            g_ColorTarget = 1;
-            show_colormenu(id, 1);
-        }
-        case 2: 
-        {
-            g_ColorTarget = 2;
-            show_colormenu(id, 2);
-        }
-        case 3: 
-        {
-            SaveSettings(id);
-            show_landingmenu(id);
-        }
+        case 0: { g_LandingEnabled = !g_LandingEnabled; show_landingmenu(id); }
+        case 1: { g_ColorTarget = 1; show_colormenu(id, 1); }
+        case 2: { g_ColorTarget = 2; show_colormenu(id, 2); }
+        case 3: { SaveSettings(id); show_landingmenu(id); }
     }
 }
 
 stock show_jumptypemenu(id)
 {
     new text[512]
-    new curr_type = 0
-    if (floatabs(g_JumpTime - LJ_JUMP_TIME) < 0.001)
-        curr_type = 1
-    else if (floatabs(g_JumpTime - SBJ_JUMP_TIME) < 0.001)
-        curr_type = 2
-    else if (floatabs(g_JumpTime - BJ_JUMP_TIME) < 0.001)
-        curr_type = 3
-   
     formatex(text, charsmax(text), "\rJump Type^n^n")
-    formatex(text, charsmax(text), "%s\r1. \wLJ/HJ/WJ/CJ/DCJ/SCJ%s^n",
-         text, curr_type == 1 ? " \y[Current]" : "")
-    formatex(text, charsmax(text), "%s\r2. \wStand-Up BJ%s^n",
-         text, curr_type == 2 ? " \y[Current]" : "")
-    formatex(text, charsmax(text), "%s\r3. \wBhop Jump%s^n^n",
-         text, curr_type == 3 ? " \y[Current]" : "")
-    formatex(text, charsmax(text), "%s\r4. \ySave Settings^n^n", text)
+    formatex(text, charsmax(text), "%s\r1. \wLJ / HJ%s^n", text, g_JumpTypeIndex == 1 ? " \y[Current]" : "")
+    formatex(text, charsmax(text), "%s\r2. \wCJ / SCJ%s^n", text, g_JumpTypeIndex == 2 ? " \y[Current]" : "")
+    formatex(text, charsmax(text), "%s\r3. \wDCJ / WJ%s^n", text, g_JumpTypeIndex == 3 ? " \y[Current]" : "")
+    formatex(text, charsmax(text), "%s\r4. \wSBJ%s^n", text, g_JumpTypeIndex == 4 ? " \y[Current]" : "")
+    formatex(text, charsmax(text), "%s\r5. \wBhop Jump%s^n^n", text, g_JumpTypeIndex == 5 ? " \y[Current]" : "")
+    formatex(text, charsmax(text), "%s\r6. \ySave Settings^n^n", text)
     formatex(text, charsmax(text), "%s\r0. \wBack", text)
-    show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<9), text, -1, MENU_JUMPTYPE)
+    show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<9), text, -1, MENU_JUMPTYPE)
 }
 
 public handle_jumptype(id, key)
 {
     if (key == 9) { show_predmenu(id); return; }
-   
-    switch (key)
+    if (key == 5) { SaveSettings(id); show_jumptypemenu(id); return; }
+    if (key >= 0 && key <= 4)
     {
-        case 0: g_JumpTime = LJ_JUMP_TIME
-        case 1: g_JumpTime = SBJ_JUMP_TIME
-        case 2: g_JumpTime = BJ_JUMP_TIME
-        case 3: { SaveSettings(id); show_jumptypemenu(id); return; }
-        case 4: { show_predmenu(id); return; }
+        g_JumpTypeIndex = key + 1
+        switch (g_JumpTypeIndex)
+        {
+            case 1,2,3: g_JumpTime = LJ_JUMP_TIME
+            case 4: g_JumpTime = SBJ_JUMP_TIME
+            case 5: g_JumpTime = BJ_JUMP_TIME
+        }
+        UpdateCurrentThresholds()
     }
     show_jumptypemenu(id)
 }
@@ -249,9 +348,9 @@ stock show_colormenu(id, target)
         formatex(title, charsmax(title), "Color 01")
     else if (target == 2)
         formatex(title, charsmax(title), "Color 02")
-    
+ 
     formatex(text, charsmax(text), "\r%s^n^n", title)
-    
+ 
     for(new i = 0; i < 8; i++)
     {
         new bool:is_current = false
@@ -261,7 +360,7 @@ stock show_colormenu(id, target)
             is_current = (i == g_SuccessRectIndex)
         else if (target == 2)
             is_current = (i == g_FailRectIndex)
-        
+     
         formatex(text, charsmax(text), "%s\r%d. \w%s (%d,%d,%d)%s^n",
                  text, i+1, g_ColorNames[i],
                  g_ColorValues[i][0], g_ColorValues[i][1], g_ColorValues[i][2],
@@ -274,15 +373,14 @@ stock show_colormenu(id, target)
 
 public handle_colormenu(id, key)
 {
-    if (key == 9) 
-    { 
+    if (key == 9)
+    {
         if (g_ColorTarget == 0)
             show_predmenu(id)
         else
             show_landingmenu(id)
-        return; 
+        return;
     }
-   
     if (key >= 0 && key <= 7)
     {
         if (g_ColorTarget == 0)
@@ -295,7 +393,7 @@ public handle_colormenu(id, key)
             g_SuccessRectIndex = key
         else if (g_ColorTarget == 2)
             g_FailRectIndex = key
-        
+     
         show_colormenu(id, g_ColorTarget)
     }
     else if (key == 8)
@@ -332,14 +430,9 @@ stock show_realtime_ymenu(id)
 public handle_realtime_y(id, key)
 {
     if (key == 9) { show_predmenu(id); return; }
-   
     switch (key)
     {
-        case 0:
-        {
-            g_ShowRealTime = !g_ShowRealTime;
-            show_realtime_ymenu(id);
-        }
+        case 0: { g_ShowRealTime = !g_ShowRealTime; show_realtime_ymenu(id); }
         case 1:
         {
             g_RealTimeY -= 0.01;
@@ -354,11 +447,7 @@ public handle_realtime_y(id, key)
                 g_RealTimeY = 0.0;
             show_realtime_ymenu(id);
         }
-        case 3:
-        {
-            g_RealTimeY = -1.0;
-            show_realtime_ymenu(id);
-        }
+        case 3: { g_RealTimeY = -1.0; show_realtime_ymenu(id); }
         case 4:
         {
             g_RealTimeHoldTime -= 0.001;
@@ -371,16 +460,8 @@ public handle_realtime_y(id, key)
             if (g_RealTimeHoldTime > 5.0) g_RealTimeHoldTime = 5.0;
             show_realtime_ymenu(id);
         }
-        case 6:
-        {
-            g_RealTimeHoldTime = 0.011;
-            show_realtime_ymenu(id);
-        }
-        case 7:
-        {
-            SaveSettings(id);
-            show_realtime_ymenu(id);
-        }
+        case 6: { g_RealTimeHoldTime = 0.011; show_realtime_ymenu(id); }
+        case 7: { SaveSettings(id); show_realtime_ymenu(id); }
     }
 }
 
@@ -417,7 +498,6 @@ stock show_stats_pos_menu(id)
 public handle_stats_pos(id, key)
 {
     if (key == 9) { show_predmenu(id); return; }
-   
     if (key == 0)
     {
         g_ShowBest = !g_ShowBest;
@@ -468,14 +548,15 @@ stock LoadSettings()
 {
     new configsdir[64]
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
-   
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction.ini", configsdir)
-   
+
     // 默认值
     g_Enabled = true
     g_ShowRealTime = true
     g_ShowBest = true
+    g_SonarEnabled = true
+    g_JumpTypeIndex = 1
     g_JumpTime = LJ_JUMP_TIME
     g_HudR = 255; g_HudG = 255; g_HudB = 0
     g_RealTimeY = -1.0
@@ -486,180 +567,293 @@ stock LoadSettings()
     g_SuccessRectIndex = 6 // Pink
     g_FailRectIndex = 5 // Cyan
     g_ColorTarget = 0
-   
-    if (file_exists(szFile))
+
+    // LJ / HJ
+    g_ThresholdCounts[0] = 27
+    g_Thresholds[0][0] = 240.0; g_Thresholds[0][1] = 245.0; g_Thresholds[0][2] = 250.0; g_Thresholds[0][3] = 253.0;
+    g_Thresholds[0][4] = 255.0; g_Thresholds[0][5] = 257.0; g_Thresholds[0][6] = 259.0; g_Thresholds[0][7] = 261.0;
+    g_Thresholds[0][8] = 263.0; g_Thresholds[0][9] = 265.0; g_Thresholds[0][10] = 267.0; g_Thresholds[0][11] = 269.0;
+    g_Thresholds[0][12] = 271.0; g_Thresholds[0][13] = 273.0; g_Thresholds[0][14] = 275.0; g_Thresholds[0][15] = 277.0;
+    g_Thresholds[0][16] = 279.0; g_Thresholds[0][17] = 281.0; g_Thresholds[0][18] = 283.0; g_Thresholds[0][19] = 285.0;
+    g_Thresholds[0][20] = 287.0; g_Thresholds[0][21] = 289.0; g_Thresholds[0][22] = 291.0; g_Thresholds[0][23] = 293.0;
+    g_Thresholds[0][24] = 295.0; g_Thresholds[0][25] = 297.0; g_Thresholds[0][26] = 299.0;
+
+    // CJ / SCJ
+    g_ThresholdCounts[1] = 21
+    g_Thresholds[1][0] = 250.0; g_Thresholds[1][1] = 255.0; g_Thresholds[1][2] = 260.0; g_Thresholds[1][3] = 265.0;
+    g_Thresholds[1][4] = 267.0; g_Thresholds[1][5] = 269.0; g_Thresholds[1][6] = 271.0; g_Thresholds[1][7] = 273.0;
+    g_Thresholds[1][8] = 275.0; g_Thresholds[1][9] = 277.0; g_Thresholds[1][10] = 279.0; g_Thresholds[1][11] = 281.0;
+    g_Thresholds[1][12] = 283.0; g_Thresholds[1][13] = 285.0; g_Thresholds[1][14] = 287.0; g_Thresholds[1][15] = 289.0;
+    g_Thresholds[1][16] = 291.0; g_Thresholds[1][17] = 293.0; g_Thresholds[1][18] = 295.0; g_Thresholds[1][19] = 297.0;
+    g_Thresholds[1][20] = 299.0;
+
+    // DCJ / WJ
+    g_ThresholdCounts[2] = 19
+    g_Thresholds[2][0] = 250.0; g_Thresholds[2][1] = 255.0; g_Thresholds[2][2] = 260.0; g_Thresholds[2][3] = 265.0;
+    g_Thresholds[2][4] = 270.0; g_Thresholds[2][5] = 272.0; g_Thresholds[2][6] = 274.0; g_Thresholds[2][7] = 276.0;
+    g_Thresholds[2][8] = 278.0; g_Thresholds[2][9] = 280.0; g_Thresholds[2][10] = 282.0; g_Thresholds[2][11] = 284.0;
+    g_Thresholds[2][12] = 286.0; g_Thresholds[2][13] = 288.0; g_Thresholds[2][14] = 290.0; g_Thresholds[2][15] = 292.0;
+    g_Thresholds[2][16] = 294.0; g_Thresholds[2][17] = 296.0; g_Thresholds[2][18] = 298.0;
+
+    // SBJ / BJ
+    g_ThresholdCounts[3] = 19
+    g_Thresholds[3][0] = 230.0; g_Thresholds[3][1] = 235.0; g_Thresholds[3][2] = 240.0; g_Thresholds[3][3] = 245.0;
+    g_Thresholds[3][4] = 247.0; g_Thresholds[3][5] = 249.0; g_Thresholds[3][6] = 251.0; g_Thresholds[3][7] = 253.0;
+    g_Thresholds[3][8] = 255.0; g_Thresholds[3][9] = 257.0; g_Thresholds[3][10] = 259.0; g_Thresholds[3][11] = 261.0;
+    g_Thresholds[3][12] = 263.0; g_Thresholds[3][13] = 265.0; g_Thresholds[3][14] = 267.0; g_Thresholds[3][15] = 269.0;
+    g_Thresholds[3][16] = 271.0; g_Thresholds[3][17] = 273.0; g_Thresholds[3][18] = 275.0;
+
+    if (!file_exists(szFile))
     {
-        new data[128], len, line = 0
-       
-        if (read_file(szFile, line, data, charsmax(data), len))
+        SaveSettings(0)
+        UpdateCurrentThresholds()
+        return
+    }
+
+    new data[128], len
+    if (read_file(szFile, 0, data, charsmax(data), len))
+    {
+        trim(data)
+        if (!equal(data, "// distance_prediction.ini"))
         {
-            trim(data)
-            new val = str_to_num(data)
-            if (val == 0 || val == 1)
-                g_Enabled = (val == 1)
-            line++
+            SaveSettings(0)
+            UpdateCurrentThresholds()
+            return
         }
-        if (read_file(szFile, line, data, charsmax(data), len))
+    }
+
+    new line = 0
+    while (read_file(szFile, line, data, charsmax(data), len))
+    {
+        trim(data)
+        if (line == 0 || data[0] == 0 || data[0] == '/') { line++; continue; }
+
+        new key[32], arg1[32], arg2[32], arg3[32]
+        new count = parse(data, key, charsmax(key), arg1, charsmax(arg1), arg2, charsmax(arg2), arg3, charsmax(arg3))
+
+        if (count >= 1)
         {
-            trim(data)
-            new type_id = str_to_num(data)
-            switch (type_id)
+            if (equal(key, "enable_plugin") && count >= 2)
+                g_Enabled = (str_to_num(arg1) == 1)
+
+            else if (equal(key, "enable_sonar") && count >= 2)
+                g_SonarEnabled = (str_to_num(arg1) == 1)
+
+            else if (equal(key, "jump_type") && count >= 2)
             {
-                case 1: g_JumpTime = LJ_JUMP_TIME
-                case 2: g_JumpTime = SBJ_JUMP_TIME
-                case 3: g_JumpTime = BJ_JUMP_TIME
-                default: g_JumpTime = LJ_JUMP_TIME
+                g_JumpTypeIndex = str_to_num(arg1)
+                if (g_JumpTypeIndex < 1 || g_JumpTypeIndex > 5)
+                    g_JumpTypeIndex = 1
+                switch (g_JumpTypeIndex)
+                {
+                    case 1,2,3: g_JumpTime = LJ_JUMP_TIME
+                    case 4: g_JumpTime = SBJ_JUMP_TIME
+                    case 5: g_JumpTime = BJ_JUMP_TIME
+                }
             }
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new r[8], g[8], b[8]
-            if (parse(data, r, charsmax(r), g, charsmax(g), b, charsmax(b)) >= 3)
+
+            else if (equal(key, "hud_color") && count >= 4)
             {
-                new rr = str_to_num(r), gg = str_to_num(g), bb = str_to_num(b)
+                new rr = str_to_num(arg1), gg = str_to_num(arg2), bb = str_to_num(arg3)
                 if (rr>=0&&rr<=255 && gg>=0&&gg<=255 && bb>=0&&bb<=255)
                 {
                     g_HudR = rr; g_HudG = gg; g_HudB = bb
                 }
             }
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new Float:val = str_to_float(data)
-            if (val >= -2.0 && val <= 2.0) g_RealTimeY = val
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new x[16], y[16]
-            if (parse(data, x, charsmax(x), y, charsmax(y)) >= 2)
+
+            else if (equal(key, "hud_realtime_y") && count >= 2)
             {
-                new Float:fx = str_to_float(x)
-                new Float:fy = str_to_float(y)
+                g_RealTimeY = str_to_float(arg1)
+                if (g_RealTimeY < -2.0 || g_RealTimeY > 2.0)
+                    g_RealTimeY = -1.0
+            }
+
+            else if (equal(key, "hud_realtime_holdtime") && count >= 2)
+            {
+                new Float:val = str_to_float(arg1)
+                if (val >= 0.0 && val <= 5.0)
+                    g_RealTimeHoldTime = val
+            }
+
+            else if (equal(key, "enable_realtime_hud") && count >= 2)
+                g_ShowRealTime = (str_to_num(arg1) == 1)
+
+            else if (equal(key, "hud_best_pos") && count >= 3)
+            {
+                new Float:fx = str_to_float(arg1)
+                new Float:fy = str_to_float(arg2)
                 if (fx >= -2.0 && fx <= 2.0) g_StatsX = fx
                 if (fy >= -2.0 && fy <= 2.0) g_StatsY = fy
             }
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new val = str_to_num(data)
-            if (val == 0 || val == 1)
-                g_ShowRealTime = (val == 1)
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new val = str_to_num(data)
-            if (val == 0 || val == 1)
-                g_ShowBest = (val == 1)
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new val = str_to_num(data)
-            if (val == 0 || val == 1)
-                g_LandingEnabled = (val == 1)
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new nr[8], ng[8], nb[8]
-            if (parse(data, nr, charsmax(nr), ng, charsmax(ng), nb, charsmax(nb)) >= 3)
+
+            else if (equal(key, "enable_best_hud") && count >= 2)
+                g_ShowBest = (str_to_num(arg1) == 1)
+
+            else if (equal(key, "enable_landingpred") && count >= 2)
+                g_LandingEnabled = (str_to_num(arg1) == 1)
+
+            else if (equal(key, "landingpred_color_succ") && count >= 4)
             {
-                new rr = str_to_num(nr), gg = str_to_num(ng), bb = str_to_num(nb)
+                new rr = str_to_num(arg1), gg = str_to_num(arg2), bb = str_to_num(arg3)
                 if (rr>=0&&rr<=255 && gg>=0&&gg<=255 && bb>=0&&bb<=255)
                 {
                     g_SuccessRectIndex = 6
-                    for(new i = 0; i < 8; i++)
+                    for (new i = 0; i < 8; i++)
                     {
                         if (g_ColorValues[i][0] == rr && g_ColorValues[i][1] == gg && g_ColorValues[i][2] == bb)
                         {
-                            g_SuccessRectIndex = i;
-                            break;
+                            g_SuccessRectIndex = i
+                            break
                         }
                     }
                 }
             }
-            line++
-        }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new nr[8], ng[8], nb[8]
-            if (parse(data, nr, charsmax(nr), ng, charsmax(ng), nb, charsmax(nb)) >= 3)
+
+            else if (equal(key, "landingpred_color_fail") && count >= 4)
             {
-                new rr = str_to_num(nr), gg = str_to_num(ng), bb = str_to_num(nb)
+                new rr = str_to_num(arg1), gg = str_to_num(arg2), bb = str_to_num(arg3)
                 if (rr>=0&&rr<=255 && gg>=0&&gg<=255 && bb>=0&&bb<=255)
                 {
                     g_FailRectIndex = 5
-                    for(new i = 0; i < 8; i++)
+                    for (new i = 0; i < 8; i++)
                     {
                         if (g_ColorValues[i][0] == rr && g_ColorValues[i][1] == gg && g_ColorValues[i][2] == bb)
                         {
-                            g_FailRectIndex = i;
-                            break;
+                            g_FailRectIndex = i
+                            break
                         }
                     }
                 }
             }
-            line++
+
+            else if (equal(key, "lj_hj_thresholds"))
+            {
+                g_ThresholdCounts[0] = 0
+                new remaining[512]
+                new pos = contain(data, key) + strlen(key)
+                if (data[pos] == ' ') pos++
+                copy(remaining, charsmax(remaining), data[pos])
+                new token[16]
+                while (remaining[0])
+                {
+                    strtok(remaining, token, charsmax(token), remaining, charsmax(remaining), ' ', 1)
+                    trim(token)
+                    if (token[0] && g_ThresholdCounts[0] < 32)
+                        g_Thresholds[0][g_ThresholdCounts[0]++] = str_to_float(token)
+                }
+            }
+            else if (equal(key, "cj_scj_thresholds"))
+            {
+                g_ThresholdCounts[1] = 0
+                new remaining[512]
+                new pos = contain(data, key) + strlen(key)
+                if (data[pos] == ' ') pos++
+                copy(remaining, charsmax(remaining), data[pos])
+                new token[16]
+                while (remaining[0])
+                {
+                    strtok(remaining, token, charsmax(token), remaining, charsmax(remaining), ' ', 1)
+                    trim(token)
+                    if (token[0] && g_ThresholdCounts[1] < 32)
+                        g_Thresholds[1][g_ThresholdCounts[1]++] = str_to_float(token)
+                }
+            }
+            else if (equal(key, "dcj_wj_thresholds"))
+            {
+                g_ThresholdCounts[2] = 0
+                new remaining[512]
+                new pos = contain(data, key) + strlen(key)
+                if (data[pos] == ' ') pos++
+                copy(remaining, charsmax(remaining), data[pos])
+                new token[16]
+                while (remaining[0])
+                {
+                    strtok(remaining, token, charsmax(token), remaining, charsmax(remaining), ' ', 1)
+                    trim(token)
+                    if (token[0] && g_ThresholdCounts[2] < 32)
+                        g_Thresholds[2][g_ThresholdCounts[2]++] = str_to_float(token)
+                }
+            }
+            else if (equal(key, "sbj_bj_thresholds"))
+            {
+                g_ThresholdCounts[3] = 0
+                new remaining[512]
+                new pos = contain(data, key) + strlen(key)
+                if (data[pos] == ' ') pos++
+                copy(remaining, charsmax(remaining), data[pos])
+                new token[16]
+                while (remaining[0])
+                {
+                    strtok(remaining, token, charsmax(token), remaining, charsmax(remaining), ' ', 1)
+                    trim(token)
+                    if (token[0] && g_ThresholdCounts[3] < 32)
+                        g_Thresholds[3][g_ThresholdCounts[3]++] = str_to_float(token)
+                }
+            }
         }
-        if (read_file(szFile, line, data, charsmax(data), len))
-        {
-            trim(data)
-            new Float:val = str_to_float(data)
-            if (val >= 0.0 && val <= 5.0)
-                g_RealTimeHoldTime = val
-        }
+        line++
     }
-    else
-    {
-        SaveSettings(0)
-    }
+
+    UpdateCurrentThresholds()
 }
 
 stock SaveSettings(id=0)
 {
     new configsdir[64]
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
-   
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction.ini", configsdir)
-   
-    new type_id = 1
-    if (floatabs(g_JumpTime - LJ_JUMP_TIME) < 0.001)
-        type_id = 1
-    else if (floatabs(g_JumpTime - SBJ_JUMP_TIME) < 0.001)
-        type_id = 2
-    else if (floatabs(g_JumpTime - BJ_JUMP_TIME) < 0.001)
-        type_id = 3
-   
+
     new fp = fopen(szFile, "wt")
     if (fp)
     {
-        fprintf(fp, "%d^n", g_Enabled ? 1 : 0)
-        fprintf(fp, "%d^n", type_id)
-        fprintf(fp, "%d %d %d^n", g_HudR, g_HudG, g_HudB)
-        fprintf(fp, "%.6f^n", g_RealTimeY)
-        fprintf(fp, "%.6f %.6f^n", g_StatsX, g_StatsY)
-        fprintf(fp, "%d^n", g_ShowRealTime ? 1 : 0)
-        fprintf(fp, "%d^n", g_ShowBest ? 1 : 0)
-        fprintf(fp, "%d^n", g_LandingEnabled ? 1 : 0)
-        fprintf(fp, "%d %d %d^n", g_ColorValues[g_SuccessRectIndex][0], g_ColorValues[g_SuccessRectIndex][1], g_ColorValues[g_SuccessRectIndex][2])
-        fprintf(fp, "%d %d %d^n", g_ColorValues[g_FailRectIndex][0], g_ColorValues[g_FailRectIndex][1], g_ColorValues[g_FailRectIndex][2])
-        fprintf(fp, "%.6f^n", g_RealTimeHoldTime)
+        fprintf(fp, "// distance_prediction.ini^n")
+        fprintf(fp, "^n")
+
+        fprintf(fp, "// General Settings^n")
+        fprintf(fp, "enable_plugin %d^n", g_Enabled ? 1 : 0)
+        fprintf(fp, "enable_sonar %d^n", g_SonarEnabled ? 1 : 0)
+        fprintf(fp, "jump_type %d^n", g_JumpTypeIndex)
+        fprintf(fp, "^n")
+
+        fprintf(fp, "// HUD Settings^n")
+        fprintf(fp, "hud_color %d %d %d^n", g_HudR, g_HudG, g_HudB)
+        fprintf(fp, "hud_realtime_y %.6f^n", g_RealTimeY)
+        fprintf(fp, "hud_realtime_holdtime %.6f^n", g_RealTimeHoldTime)
+        fprintf(fp, "enable_realtime_hud %d^n", g_ShowRealTime ? 1 : 0)
+        fprintf(fp, "hud_best_pos %.6f %.6f^n", g_StatsX, g_StatsY)
+        fprintf(fp, "enable_best_hud %d^n", g_ShowBest ? 1 : 0)
+        fprintf(fp, "^n")
+
+        fprintf(fp, "// Landing Prediction Settings^n")
+        fprintf(fp, "enable_landingpred %d^n", g_LandingEnabled ? 1 : 0)
+        fprintf(fp, "landingpred_color_succ %d %d %d^n", g_ColorValues[g_SuccessRectIndex][0], g_ColorValues[g_SuccessRectIndex][1], g_ColorValues[g_SuccessRectIndex][2])
+        fprintf(fp, "landingpred_color_fail %d %d %d^n", g_ColorValues[g_FailRectIndex][0], g_ColorValues[g_FailRectIndex][1], g_ColorValues[g_FailRectIndex][2])
+        fprintf(fp, "^n")
+
+        fprintf(fp, "// Sound Thresholds^n")
+        fprintf(fp, "lj_hj_thresholds")
+        for (new i = 0; i < g_ThresholdCounts[0]; i++)
+            fprintf(fp, " %.0f", g_Thresholds[0][i])
+        fprintf(fp, "^n")
+
+        fprintf(fp, "cj_scj_thresholds")
+        for (new i = 0; i < g_ThresholdCounts[1]; i++)
+            fprintf(fp, " %.0f", g_Thresholds[1][i])
+        fprintf(fp, "^n")
+
+        fprintf(fp, "dcj_wj_thresholds")
+        for (new i = 0; i < g_ThresholdCounts[2]; i++)
+            fprintf(fp, " %.0f", g_Thresholds[2][i])
+        fprintf(fp, "^n")
+
+        fprintf(fp, "sbj_bj_thresholds")
+        for (new i = 0; i < g_ThresholdCounts[3]; i++)
+            fprintf(fp, " %.0f", g_Thresholds[3][i])
+        fprintf(fp, "^n")
+
         fclose(fp)
-       
+    
         if (id != 0)
             client_print_color(id, id, "^4[7yPh00N]^1 Settings Saved in ^4distance_prediction.ini")
     }
@@ -678,10 +872,8 @@ stock Float:GetMoveAngle(id)
     new bool:right = !!(buttons & IN_MOVERIGHT)
     new bool:front = !!(buttons & IN_FORWARD)
     new bool:back = !!(buttons & IN_BACK)
-  
     if ((left && right) || (front && back))
         return -1.0
-  
     new Float:dx = 0.0, Float:dy = 0.0
     if (right) dx = 1.0
     else if (left) dx = -1.0
@@ -689,7 +881,6 @@ stock Float:GetMoveAngle(id)
     else if (back) dy = -1.0
     if (dx == 0.0 && dy == 0.0)
         return -1.0
-  
     new Float:angle = floatatan2(dy, dx, radian)
     angle = angle * (180.0 / 3.14159265358979323846)
     if (angle < 0.0) angle += 360.0
@@ -701,26 +892,24 @@ stock Float:GetGroundZInRectangle(id, Float:origin[3])
     static const Float:offsets[5][2] = {
         {0.0, 0.0}, {-16.0, 16.0}, {16.0, 16.0}, {16.0, -16.0}, {-16.0, -16.0}
     }
-   
     new Float:highestZ = -9999.0
     new Float:start[3], Float:end[3]
-   
     for (new i = 0; i < 5; i++)
     {
         start[0] = origin[0] + offsets[i][0]
         start[1] = origin[1] + offsets[i][1]
         start[2] = origin[2] + 1.0
-       
+    
         end[0] = start[0]
         end[1] = start[1]
         end[2] = start[2] - 100.0
-       
+    
         new tr = create_tr2()
         engfunc(EngFunc_TraceLine, start, end, 1, id, tr)
-       
+    
         new Float:frac
         get_tr2(tr, 4, frac)
-       
+    
         if (frac < 1.0)
         {
             new Float:hit[3]
@@ -730,10 +919,8 @@ stock Float:GetGroundZInRectangle(id, Float:origin[3])
         }
         free_tr2(tr)
     }
-   
     if (highestZ == -9999.0)
         highestZ = origin[2]
-   
     return highestZ
 }
 
@@ -742,25 +929,23 @@ stock bool:CheckGroundMatch(id, Float:predX, Float:predY, Float:targetZ)
     static const Float:offsets[5][2] = {
         {0.0, 0.0}, {-16.0, 16.0}, {16.0, 16.0}, {16.0, -16.0}, {-16.0, -16.0}
     }
-   
     new Float:start[3], Float:end[3]
-   
     for (new i = 0; i < 5; i++)
     {
         start[0] = predX + offsets[i][0]
         start[1] = predY + offsets[i][1]
         start[2] = targetZ + 1.0
-       
+    
         end[0] = start[0]
         end[1] = start[1]
         end[2] = start[2] - 100.0
-       
+    
         new tr = create_tr2()
         engfunc(EngFunc_TraceLine, start, end, 1, id, tr)
-       
+    
         new Float:frac
         get_tr2(tr, 4, frac)
-       
+    
         if (frac < 1.0)
         {
             new Float:hit[3]
@@ -779,23 +964,22 @@ stock bool:CheckGroundMatch(id, Float:predX, Float:predY, Float:targetZ)
 stock StartJump(id)
 {
     clear_strafe_stats(id)
-  
     g_JumpActive[id] = true
     g_StatsDisplayed[id] = false
     g_UseUpperRect[id] = false
     g_JumpStartTime[id] = get_gametime()
     pev(id, pev_origin, g_JumpStartOrigin[id])
-  
     new Float:vel[3]
     pev(id, pev_velocity, vel)
     new Float:horiz = floatsqroot(vel[0]*vel[0] + vel[1]*vel[1])
     g_InitialPredicted[id] = horiz * g_JumpTime + 32.0
-  
     g_StrafeCount[id] = 0
     g_CurrentStrafeAngle[id] = -1.0
     for(new i = 0; i < 32; i++)
         g_StrafeMaxDistance[id][i] = 0.0
-  
+      
+    g_ThresholdReached[id] = 0
+    g_FlashFrames[id] = 0
     remove_task(id)
     set_task(g_JumpTime, "DisplayJumpStats", id)
 }
@@ -814,7 +998,6 @@ public fw_PlayerPreThink(id)
         }
         return FMRES_IGNORED;
     }
-   
     if (!is_user_alive(id))
     {
         g_JumpActive[id] = false
@@ -824,22 +1007,18 @@ public fw_PlayerPreThink(id)
         g_PreJumpTime[id] = 0.0;
         return FMRES_IGNORED
     }
-  
     new flags = pev(id, pev_flags)
     new bool:onGround = !!(flags & FL_ONGROUND)
     new Float:currTime = get_gametime()
-  
     new Float:currOrigin[3]
     pev(id, pev_origin, currOrigin)
-  
     new buttons = pev(id, pev_button)
     new oldbuttons = pev(id, pev_oldbuttons)
 
-    // SBJ/BJ起跳判定
     if ((buttons & IN_JUMP) && !(oldbuttons & IN_JUMP) && onGround)
     {
-        new bool:isLJ = (floatabs(g_JumpTime - LJ_JUMP_TIME) < 0.001);
-        
+        new bool:isLJ = (g_JumpTypeIndex <= 3);
+      
         if (isLJ)
         {
             StartJump(id);
@@ -870,30 +1049,43 @@ public fw_PlayerPreThink(id)
             }
         }
     }
-
+  
     if (g_JumpActive[id])
     {
         new Float:elapsed = currTime - g_JumpStartTime[id]
         new Float:remaining = g_JumpTime - elapsed
         if (remaining < 0.0) remaining = 0.0
-      
+   
         new Float:velocity[3]
         pev(id, pev_velocity, velocity)
-      
+   
         new Float:predX = currOrigin[0] + velocity[0] * remaining
         new Float:predY = currOrigin[1] + velocity[1] * remaining
         new Float:dx = predX - g_JumpStartOrigin[id][0]
         new Float:dy = predY - g_JumpStartOrigin[id][1]
         new Float:totalDistance = floatsqroot(dx*dx + dy*dy) + 32.0
-      
+   
         g_PredX[id] = predX
         g_PredY[id] = predY
         g_PredZ[id] = g_GroundZ[id]
-      
+   
         if (!onGround && remaining > 0.0)
         {
-            new Float:currAngle = GetMoveAngle(id)
+            if (g_SonarEnabled)
+            {
+                for (new i = 0; i < g_CurrentThresholdCount; i++)
+                {
+                    if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[i])
+                    {
+                        g_ThresholdReached[id] |= (1 << i);
+                        emit_sound(id, CHAN_AUTO, "7yPh00N/blip1.wav", 1.0, ATTN_NORM, 0, PITCH_NORM);
+                        g_FlashFrames[id] = 3;
+                    }
+                }
+            }
           
+            new Float:currAngle = GetMoveAngle(id)
+       
             if (currAngle >= 0.0)
             {
                 if (g_CurrentStrafeAngle[id] < 0.0)
@@ -907,7 +1099,7 @@ public fw_PlayerPreThink(id)
                 {
                     new Float:diff = floatabs(currAngle - g_CurrentStrafeAngle[id])
                     if (diff > 180.0) diff = 360.0 - diff
-                  
+               
                     if (diff > 45.0)
                     {
                         g_StrafeCount[id]++
@@ -922,15 +1114,23 @@ public fw_PlayerPreThink(id)
             else if (g_StrafeCount[id] > 0 && totalDistance > g_StrafeMaxDistance[id][g_StrafeCount[id]])
                 g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
         }
-      
+   
         if (remaining > 0.0)
         {
             if (g_ShowRealTime)
             {
-                set_dhudmessage(g_HudR, g_HudG, g_HudB, -1.0, g_RealTimeY, 0, 0.0, g_RealTimeHoldTime, 0.0, 0.0)
+                if (g_FlashFrames[id] > 0)
+                {
+                    set_dhudmessage(255, 255, 255, -1.0, g_RealTimeY, 0, 0.0, g_RealTimeHoldTime, 0.0, 0.0);
+                    g_FlashFrames[id]--;
+                }
+                else
+                {
+                    set_dhudmessage(g_HudR, g_HudG, g_HudB, -1.0, g_RealTimeY, 0, 0.0, g_RealTimeHoldTime, 0.0, 0.0);
+                }
                 show_dhudmessage(id, "%.1f", totalDistance)
             }
-          
+       
             if (g_LandingEnabled)
             {
                 g_UseUpperRect[id] = CheckGroundMatch(id, predX, predY, g_GroundZ[id])
@@ -947,7 +1147,6 @@ public fw_PlayerPreThink(id)
             g_PreJumpTime[id] = 0.0;
         }
     }
-  
     return FMRES_IGNORED
 }
 
@@ -974,10 +1173,8 @@ stock show_strafe_stats(id)
 {
     if (g_StrafeCount[id] <= 0)
         return
-  
     new text[1024]
     format(text, charsmax(text), "Best Predicted Distance:^n")
-  
     for(new i = 1; i <= g_StrafeCount[id]; i++)
     {
         new Float:this_max = g_StrafeMaxDistance[id][i]
@@ -986,13 +1183,11 @@ stock show_strafe_stats(id)
         if (delta >= 0.0) sign = "+"
         format(text, charsmax(text), "%sStrafe %02d: %.1f (%s%.1f)^n", text, i, this_max, sign, delta)
     }
-  
     if (g_ShowBest)
     {
         set_hudmessage(g_HudR, g_HudG, g_HudB, g_StatsX, g_StatsY, 0, 0.0, 999999.0, 0.0, 0.0, 4)
         show_hudmessage(id, text)
     }
-  
     client_print(id, print_console, "Best Predicted Distance:")
     for(new i = 1; i <= g_StrafeCount[id]; i++)
     {
@@ -1011,13 +1206,13 @@ stock DrawPredictionRect(id, Float:predX, Float:predY, Float:predZ, bool:useUppe
     new r = g_ColorValues[idx][0]
     new g = g_ColorValues[idx][1]
     new b = g_ColorValues[idx][2]
-    
+
     new Float:tl[3], Float:tr[3], Float:br[3], Float:bl[3]
     tl[0] = predX - half; tl[1] = predY + half; tl[2] = predZ + 0.1
     tr[0] = predX + half; tr[1] = predY + half; tr[2] = predZ + 0.1
     br[0] = predX + half; br[1] = predY - half; br[2] = predZ + 0.1
     bl[0] = predX - half; bl[1] = predY - half; bl[2] = predZ + 0.1
-    
+ 
     DrawBeamLine(id, tl, tr, r, g, b)
     DrawBeamLine(id, tr, br, r, g, b)
     DrawBeamLine(id, br, bl, r, g, b)
