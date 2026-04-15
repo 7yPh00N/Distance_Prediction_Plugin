@@ -46,7 +46,7 @@
 
 1. Added sonar feature
 
-2. Added many new commands
+2. Added some new commands
 
 3. Refactored config file read & write methods
 
