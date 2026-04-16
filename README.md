@@ -12,15 +12,15 @@
 
 - `/dps` - Open Plugin Settings Menu
 
-- `/distpred` - Enable / Disable Plugin
+- `/distpred` - Enable/Disable Plugin
 
-- `/sonar` - Enable / Disable Sonar
+- `/sonar` - Enable/Disable Sonar
 
-- `/rtpredhud` - Enable / Disable Real-Time Prediction HUD
+- `/rtpredhud` - Enable/Disable Real-Time Prediction HUD
 
-- `/bestpredhud` - Enable / Disable Best Predicted Distance HUD
+- `/bestpredhud` - Enable/Disable Best Predicted Distance HUD
 
-- `/landingpred` - Enable / Disable Landing Area Prediction
+- `/landingpred` - Enable/Disable Landing Area Prediction
 
 - `/ljpred` - Long Jump
 
@@ -48,7 +48,7 @@
 
 2. Added 13 new plugin commands
 
-3. Refactored config file read & write methods
+3. Refactored config file read/write methods
 
 ## V1.2.0
 
