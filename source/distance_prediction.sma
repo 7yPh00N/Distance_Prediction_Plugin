@@ -2,12 +2,8 @@
 #include <fakemeta>
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.3.0"
+new const PLUGIN_VERSION[] = "1.3.1"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
-
-new const Float:LJ_JUMP_TIME = 0.73227289328465705598
-new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
-new const Float:BJ_JUMP_TIME = 0.65389425396792266731 // kz_longjumps2
 
 new const g_ColorNames[8][] = { "Yellow", "Orange", "Red", "Green", "Blue", "Cyan", "Pink", "White" }
 new const g_ColorValues[8][3] = {
@@ -19,7 +15,7 @@ new bool:g_Enabled = true
 new bool:g_ShowRealTime = true
 new bool:g_ShowBest = true
 new bool:g_SonarEnabled = true
-new Float:g_JumpTime
+new Float:g_Gravity
 new g_HudR = 255, g_HudG = 255, g_HudB = 0
 new Float:g_RealTimeY = -1.0
 new Float:g_RealTimeHoldTime = 0.011
@@ -31,7 +27,6 @@ new g_FailRectIndex
 new g_ColorTarget
 
 new g_JumpTypeIndex = 1
-new Float:g_JumpStartTime[33]
 new Float:g_JumpStartOrigin[33][3]
 new Float:g_GroundZ[33]
 new Float:g_InitialPredicted[33]
@@ -49,7 +44,11 @@ new Float:g_PreJumpTime[33]
 new Float:g_PreJumpGroundZ[33]
 new g_ThresholdReached[33]
 new g_FlashFrames[33]
+new bool:g_JumpFirstFrame[33]
+new bool:g_DuckStart[33]
 
+
+new Float:g_PrevOrigin[33][3]
 new Float:g_Thresholds[4][32]
 new g_ThresholdCounts[4]
 new Float:g_CurrentThresholds[32]
@@ -64,6 +63,43 @@ new const MENU_REALTIME_Y[] = "RealTimeMenu"
 new const MENU_STATS_POS[] = "BestPredMenu"
 new const MENU_LANDING[] = "LandingAreaMenu"
 
+stock Float:CalcTimeToLand(Float:z0, Float:vz0, Float:targetZ, Float:grav)
+{
+    if (grav <= 0.0)
+        return 0.0
+
+    // SBJ & SCJ (FOG1)
+    if (floatabs(z0 - targetZ) < 0.001)
+    {
+        if (vz0 <= 0.0)
+            return 0.0
+        // t = 2 * vz0 / grav
+        return (2.0 * vz0) / grav
+    }
+
+    new Float:a = -0.5 * grav
+    new Float:b = vz0
+    new Float:c = z0 - targetZ
+
+    new Float:disc = b * b - 4.0 * a * c
+    if (disc < 0.0)
+        return 0.0
+
+    new Float:sqrtD = floatsqroot(disc)
+    new Float:t1 = (-b + sqrtD) / (2.0 * a)
+    new Float:t2 = (-b - sqrtD) / (2.0 * a)
+
+    // 排除0解，取非0解正根
+    const Float:EPS = 0.0001
+    new Float:result = 0.0
+    if (t1 > EPS)
+        result = t1
+    if (t2 > EPS && (result == 0.0 || t2 < result))
+        result = t2
+
+    return result
+}
+
 public plugin_precache()
 {
     g_BeamSprite = precache_model("sprites/laserbeam.spr")
@@ -75,6 +111,9 @@ public plugin_init()
 {
     register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
     register_forward(FM_PlayerPreThink, "fw_PlayerPreThink")
+    g_Gravity = get_cvar_float("sv_gravity")
+    if (g_Gravity <= 0.0)
+        g_Gravity = 800.0
     LoadSettings()
     register_clcmd("say /dps", "cmd_predmenu")
     register_clcmd("say_team /dps", "cmd_predmenu")
@@ -106,10 +145,10 @@ stock UpdateCurrentThresholds()
     new type
     switch (g_JumpTypeIndex)
     {
-        case 1: type = 0   // LJ / HJ
-        case 2: type = 1   // CJ / SCJ
-        case 3: type = 2   // DCJ / WJ
-        default: type = 3  // SBJ / BJ
+        case 1: type = 0
+        case 2: type = 1
+        case 3: type = 2
+        default: type = 3
     }
     g_CurrentThresholdCount = g_ThresholdCounts[type]
     for (new i = 0; i < g_CurrentThresholdCount; i++)
@@ -120,7 +159,6 @@ public cmd_set_lj(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_JumpTypeIndex = 1;
-    g_JumpTime = LJ_JUMP_TIME;
     UpdateCurrentThresholds();
     client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3LJ / HJ");
     SaveSettings(id);
@@ -130,7 +168,6 @@ public cmd_set_cj(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_JumpTypeIndex = 2;
-    g_JumpTime = LJ_JUMP_TIME;
     UpdateCurrentThresholds();
     client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3CJ / SCJ");
     SaveSettings(id);
@@ -140,7 +177,6 @@ public cmd_set_dcj(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_JumpTypeIndex = 3;
-    g_JumpTime = LJ_JUMP_TIME;
     UpdateCurrentThresholds();
     client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3DCJ / WJ");
     SaveSettings(id);
@@ -150,7 +186,6 @@ public cmd_set_sbj(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_JumpTypeIndex = 4;
-    g_JumpTime = SBJ_JUMP_TIME;
     UpdateCurrentThresholds();
     client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3SBJ");
     SaveSettings(id);
@@ -160,7 +195,6 @@ public cmd_set_bj(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_JumpTypeIndex = 5;
-    g_JumpTime = BJ_JUMP_TIME;
     UpdateCurrentThresholds();
     client_print_color(id, id, "^4[7yPh00N]^1 Jump Type: ^3BJ");
     SaveSettings(id);
@@ -225,6 +259,11 @@ public client_connect(id)
     g_PreJumpGroundZ[id] = 0.0
     g_ThresholdReached[id] = 0
     g_FlashFrames[id] = 0
+    g_JumpFirstFrame[id] = false
+    g_DuckStart[id] = false
+    g_PrevOrigin[id][0] = 0.0
+    g_PrevOrigin[id][1] = 0.0
+    g_PrevOrigin[id][2] = 0.0
     for(new i = 0; i < 32; i++)
         g_StrafeMaxDistance[id][i] = 0.0
 }
@@ -327,13 +366,6 @@ public handle_jumptype(id, key)
     if (key >= 0 && key <= 4)
     {
         g_JumpTypeIndex = key + 1
-        switch (g_JumpTypeIndex)
-        {
-            case 1,2,3: g_JumpTime = LJ_JUMP_TIME
-            case 4: g_JumpTime = SBJ_JUMP_TIME
-            case 5: g_JumpTime = BJ_JUMP_TIME
-        }
-        UpdateCurrentThresholds()
     }
     show_jumptypemenu(id)
 }
@@ -551,21 +583,19 @@ stock LoadSettings()
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction.ini", configsdir)
 
-    // 默认值
     g_Enabled = true
     g_ShowRealTime = true
     g_ShowBest = true
     g_SonarEnabled = true
     g_JumpTypeIndex = 1
-    g_JumpTime = LJ_JUMP_TIME
     g_HudR = 255; g_HudG = 255; g_HudB = 0
     g_RealTimeY = -1.0
     g_RealTimeHoldTime = 0.011
     g_StatsX = -1.0
     g_StatsY = 0.25
     g_LandingEnabled = true
-    g_SuccessRectIndex = 6 // Pink
-    g_FailRectIndex = 5 // Cyan
+    g_SuccessRectIndex = 6
+    g_FailRectIndex = 5
     g_ColorTarget = 0
 
     // LJ / HJ
@@ -644,12 +674,6 @@ stock LoadSettings()
                 g_JumpTypeIndex = str_to_num(arg1)
                 if (g_JumpTypeIndex < 1 || g_JumpTypeIndex > 5)
                     g_JumpTypeIndex = 1
-                switch (g_JumpTypeIndex)
-                {
-                    case 1,2,3: g_JumpTime = LJ_JUMP_TIME
-                    case 4: g_JumpTime = SBJ_JUMP_TIME
-                    case 5: g_JumpTime = BJ_JUMP_TIME
-                }
             }
 
             else if (equal(key, "hud_color") && count >= 4)
@@ -961,18 +985,31 @@ stock bool:CheckGroundMatch(id, Float:predX, Float:predY, Float:targetZ)
     return false
 }
 
-stock StartJump(id)
+stock StartJump(id, bool:ducking)
 {
     clear_strafe_stats(id)
     g_JumpActive[id] = true
     g_StatsDisplayed[id] = false
     g_UseUpperRect[id] = false
-    g_JumpStartTime[id] = get_gametime()
+    g_JumpFirstFrame[id] = true
+    g_DuckStart[id] = ducking
     pev(id, pev_origin, g_JumpStartOrigin[id])
+
     new Float:vel[3]
     pev(id, pev_velocity, vel)
     new Float:horiz = floatsqroot(vel[0]*vel[0] + vel[1]*vel[1])
-    g_InitialPredicted[id] = horiz * g_JumpTime + 32.0
+
+    new Float:offset = ducking ? 0.0 : -18.0
+    new Float:targetZ = g_JumpStartOrigin[id][2] + offset
+
+    new Float:vz0 = floatsqroot(2.0 * g_Gravity * 45.0)
+
+    new Float:t_initial = CalcTimeToLand(g_JumpStartOrigin[id][2], vz0, targetZ, g_Gravity)
+    if (t_initial <= 0.0)
+        t_initial = 0.732
+
+    g_InitialPredicted[id] = horiz * t_initial + 32.0
+
     g_StrafeCount[id] = 0
     g_CurrentStrafeAngle[id] = -1.0
     for(new i = 0; i < 32; i++)
@@ -980,8 +1017,6 @@ stock StartJump(id)
       
     g_ThresholdReached[id] = 0
     g_FlashFrames[id] = 0
-    remove_task(id)
-    set_task(g_JumpTime, "DisplayJumpStats", id)
 }
 
 public fw_PlayerPreThink(id)
@@ -992,7 +1027,6 @@ public fw_PlayerPreThink(id)
         {
             g_JumpActive[id] = false;
             g_StatsDisplayed[id] = false;
-            remove_task(id)
             g_PreJumpActive[id] = false;
             g_PreJumpTime[id] = 0.0;
         }
@@ -1002,26 +1036,45 @@ public fw_PlayerPreThink(id)
     {
         g_JumpActive[id] = false
         g_StatsDisplayed[id] = false
-        remove_task(id)
         g_PreJumpActive[id] = false;
         g_PreJumpTime[id] = 0.0;
         return FMRES_IGNORED
     }
-    new flags = pev(id, pev_flags)
-    new bool:onGround = !!(flags & FL_ONGROUND)
-    new Float:currTime = get_gametime()
+
     new Float:currOrigin[3]
     pev(id, pev_origin, currOrigin)
+    if (g_PrevOrigin[id][0] != 0.0 || g_PrevOrigin[id][1] != 0.0 || g_PrevOrigin[id][2] != 0.0)
+    {
+        new Float:delta = vector_distance(currOrigin, g_PrevOrigin[id])
+        // 单帧位移超过50（读点）时重置
+        if (delta > 50.0 && g_JumpActive[id])
+        {
+            if (!g_StatsDisplayed[id] && g_InitialPredicted[id] > 0.0)
+            {
+                g_StatsDisplayed[id] = true;
+                show_strafe_stats(id);
+            }
+            g_JumpActive[id] = false;
+            g_PreJumpActive[id] = false;
+            g_PreJumpTime[id] = 0.0;
+        }
+    }
+
+    g_PrevOrigin[id] = currOrigin
+
+    new flags = pev(id, pev_flags)
+    new bool:onGround = !!(flags & FL_ONGROUND)
     new buttons = pev(id, pev_button)
     new oldbuttons = pev(id, pev_oldbuttons)
 
     if ((buttons & IN_JUMP) && !(oldbuttons & IN_JUMP) && onGround)
     {
         new bool:isLJ = (g_JumpTypeIndex <= 3);
+        new bool:ducking = !!(pev(id, pev_flags) & FL_DUCKING)
       
         if (isLJ)
         {
-            StartJump(id);
+            StartJump(id, ducking);
             g_GroundZ[id] = GetGroundZInRectangle(id, currOrigin);
         }
         else
@@ -1029,21 +1082,21 @@ public fw_PlayerPreThink(id)
             if (!g_PreJumpActive[id])
             {
                 g_PreJumpActive[id] = true;
-                g_PreJumpTime[id] = currTime;
+                g_PreJumpTime[id] = get_gametime();
                 g_PreJumpGroundZ[id] = GetGroundZInRectangle(id, currOrigin);
             }
             else
             {
-                if (currTime - g_PreJumpTime[id] <= 0.8)
+                if (get_gametime() - g_PreJumpTime[id] <= 0.8)
                 {
-                    StartJump(id);
+                    StartJump(id, ducking);
                     g_GroundZ[id] = g_PreJumpGroundZ[id];
                     g_PreJumpActive[id] = false;
                     g_PreJumpTime[id] = 0.0;
                 }
                 else
                 {
-                    g_PreJumpTime[id] = currTime;
+                    g_PreJumpTime[id] = get_gametime();
                     g_PreJumpGroundZ[id] = GetGroundZInRectangle(id, currOrigin);
                 }
             }
@@ -1052,13 +1105,36 @@ public fw_PlayerPreThink(id)
   
     if (g_JumpActive[id])
     {
-        new Float:elapsed = currTime - g_JumpStartTime[id]
-        new Float:remaining = g_JumpTime - elapsed
-        if (remaining < 0.0) remaining = 0.0
-   
+        // 如果在跳跃过程中检测到onground状态，提前结束预测
+        if (onGround && !g_JumpFirstFrame[id])
+        {
+            if (!g_StatsDisplayed[id] && g_InitialPredicted[id] > 0.0)
+            {
+                g_StatsDisplayed[id] = true;
+                show_strafe_stats(id);
+            }
+            g_JumpActive[id] = false;
+            g_PreJumpActive[id] = false;
+            g_PreJumpTime[id] = 0.0;
+            return FMRES_IGNORED;
+        }
+
         new Float:velocity[3]
         pev(id, pev_velocity, velocity)
    
+        new Float:offset = g_DuckStart[id] ? 0.0 : -18.0
+        new Float:targetZ = g_JumpStartOrigin[id][2] + offset
+
+        new Float:vz_for_calc = velocity[2]
+        if (g_JumpFirstFrame[id])
+        {
+            vz_for_calc = floatsqroot(2.0 * g_Gravity * 45.0)
+            g_JumpFirstFrame[id] = false
+        }
+
+        new Float:remaining = CalcTimeToLand(currOrigin[2], vz_for_calc, targetZ, g_Gravity)
+        if (remaining < 0.0) remaining = 0.0
+
         new Float:predX = currOrigin[0] + velocity[0] * remaining
         new Float:predY = currOrigin[1] + velocity[1] * remaining
         new Float:dx = predX - g_JumpStartOrigin[id][0]
@@ -1068,53 +1144,7 @@ public fw_PlayerPreThink(id)
         g_PredX[id] = predX
         g_PredY[id] = predY
         g_PredZ[id] = g_GroundZ[id]
-   
-        if (!onGround && remaining > 0.0)
-        {
-            if (g_SonarEnabled)
-            {
-                for (new i = 0; i < g_CurrentThresholdCount; i++)
-                {
-                    if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[i])
-                    {
-                        g_ThresholdReached[id] |= (1 << i);
-                        emit_sound(id, CHAN_AUTO, "7yPh00N/blip1.wav", 1.0, ATTN_NORM, 0, PITCH_NORM);
-                        g_FlashFrames[id] = 3;
-                    }
-                }
-            }
-          
-            new Float:currAngle = GetMoveAngle(id)
-       
-            if (currAngle >= 0.0)
-            {
-                if (g_CurrentStrafeAngle[id] < 0.0)
-                {
-                    g_StrafeCount[id]++
-                    if (g_StrafeCount[id] > 31) g_StrafeCount[id] = 31
-                    g_CurrentStrafeAngle[id] = currAngle
-                    g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
-                }
-                else
-                {
-                    new Float:diff = floatabs(currAngle - g_CurrentStrafeAngle[id])
-                    if (diff > 180.0) diff = 360.0 - diff
-               
-                    if (diff > 45.0)
-                    {
-                        g_StrafeCount[id]++
-                        if (g_StrafeCount[id] > 31) g_StrafeCount[id] = 31
-                        g_CurrentStrafeAngle[id] = currAngle
-                        g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
-                    }
-                    else if (totalDistance > g_StrafeMaxDistance[id][g_StrafeCount[id]])
-                        g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
-                }
-            }
-            else if (g_StrafeCount[id] > 0 && totalDistance > g_StrafeMaxDistance[id][g_StrafeCount[id]])
-                g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
-        }
-   
+
         if (remaining > 0.0)
         {
             if (g_ShowRealTime)
@@ -1128,7 +1158,7 @@ public fw_PlayerPreThink(id)
                 {
                     set_dhudmessage(g_HudR, g_HudG, g_HudB, -1.0, g_RealTimeY, 0, 0.0, g_RealTimeHoldTime, 0.0, 0.0);
                 }
-                show_dhudmessage(id, "%.1f", totalDistance)
+                show_dhudmessage(id, "%.2f", totalDistance)
             }
        
             if (g_LandingEnabled)
@@ -1136,31 +1166,63 @@ public fw_PlayerPreThink(id)
                 g_UseUpperRect[id] = CheckGroundMatch(id, predX, predY, g_GroundZ[id])
                 DrawPredictionRect(id, predX, predY, g_GroundZ[id], g_UseUpperRect[id])
             }
+
+            if (!onGround)
+            {
+                if (g_SonarEnabled)
+                {
+                    for (new i = 0; i < g_CurrentThresholdCount; i++)
+                    {
+                        if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[i])
+                        {
+                            g_ThresholdReached[id] |= (1 << i);
+                            emit_sound(id, CHAN_AUTO, "7yPh00N/blip1.wav", 1.0, ATTN_NORM, 0, PITCH_NORM);
+                            g_FlashFrames[id] = 3;
+                        }
+                    }
+                }
+              
+                new Float:currAngle = GetMoveAngle(id)
+           
+                if (currAngle >= 0.0)
+                {
+                    if (g_CurrentStrafeAngle[id] < 0.0)
+                    {
+                        g_StrafeCount[id]++
+                        if (g_StrafeCount[id] > 31) g_StrafeCount[id] = 31
+                        g_CurrentStrafeAngle[id] = currAngle
+                        g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
+                    }
+                    else
+                    {
+                        new Float:diff = floatabs(currAngle - g_CurrentStrafeAngle[id])
+                        if (diff > 180.0) diff = 360.0 - diff
+                   
+                        if (diff > 45.0)
+                        {
+                            g_StrafeCount[id]++
+                            if (g_StrafeCount[id] > 31) g_StrafeCount[id] = 31
+                            g_CurrentStrafeAngle[id] = currAngle
+                            g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
+                        }
+                        else if (totalDistance > g_StrafeMaxDistance[id][g_StrafeCount[id]])
+                            g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
+                    }
+                }
+                else if (g_StrafeCount[id] > 0 && totalDistance > g_StrafeMaxDistance[id][g_StrafeCount[id]])
+                    g_StrafeMaxDistance[id][g_StrafeCount[id]] = totalDistance
+            }
         }
-        else if (!g_StatsDisplayed[id])
+        else if (onGround && !g_StatsDisplayed[id] && g_InitialPredicted[id] > 0.0)
         {
             g_StatsDisplayed[id] = true
             show_strafe_stats(id)
-            remove_task(id)
             g_JumpActive[id] = false
             g_PreJumpActive[id] = false;
             g_PreJumpTime[id] = 0.0;
         }
     }
     return FMRES_IGNORED
-}
-
-public DisplayJumpStats(id)
-{
-    if (!is_user_connected(id)) return
-    if (!g_StatsDisplayed[id])
-    {
-        g_StatsDisplayed[id] = true
-        show_strafe_stats(id)
-    }
-    g_JumpActive[id] = false
-    g_PreJumpActive[id] = false;
-    g_PreJumpTime[id] = 0.0;
 }
 
 stock clear_strafe_stats(id)
