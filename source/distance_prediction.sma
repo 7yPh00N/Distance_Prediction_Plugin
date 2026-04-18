@@ -112,8 +112,6 @@ public plugin_init()
     register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
     register_forward(FM_PlayerPreThink, "fw_PlayerPreThink")
     g_Gravity = get_cvar_float("sv_gravity")
-    if (g_Gravity <= 0.0)
-        g_Gravity = 800.0
     LoadSettings()
     register_clcmd("say /dps", "cmd_predmenu")
     register_clcmd("say_team /dps", "cmd_predmenu")
