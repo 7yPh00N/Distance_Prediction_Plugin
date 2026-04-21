@@ -42,15 +42,15 @@
 
 # Changelog
 
-## V1.4.0
+## V1.4.0 (Coming Soon)
 
 ### 2026.04.21
 
-1. Added LDJ (ladder jump)
-
-2. Improved distance prediction feature
+1. Improved distance prediction feature
 
 - Introduced vertical velocity & gravitational acceleration to improve calculation accuracy
+  
+2. Added LDJ (ladder jump)
 
 3. Fixed some bugs
 
