@@ -50,7 +50,7 @@
 
 2. Improved distance prediction feature
 
-- Introduce vertical velocity and gravitational acceleration to improve calculation accuracy
+- Introduce vertical velocity & gravitational acceleration to improve calculation accuracy
 
 3. Fixed some bugs
 
