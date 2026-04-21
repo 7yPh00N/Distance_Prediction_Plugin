@@ -38,7 +38,21 @@
 
 - `/bjpred` - Bhop Jump
 
+- `/ldjpred` - Ladder Jump
+
 # Changelog
+
+## V1.4.0
+
+### 2026.04.21
+
+1. Added LDJ (ladder jump)
+
+2. Improved distance prediction feature
+
+- Introduce vertical velocity and gravitational acceleration to improve calculation accuracy
+
+3. Fixed some bugs
 
 ## V1.3.0
 
