@@ -28,7 +28,7 @@ new bool:g_LandingEnabled[33]
 new g_SuccessRectIndex[33]
 new g_FailRectIndex[33]
 new g_ColorTarget[33]
-new g_JumpTypeIndex[33] = {1, ...}
+new g_JumpTypeIndex[33]
 new Float:g_JumpStartOrigin[33][3]
 new Float:g_GroundZ[33]
 new Float:g_InitialPredicted[33]
