@@ -44,7 +44,7 @@
 
 ## V1.4.0 (Coming Soon)
 
-### 2026.04.21
+### 2026.04.xx
 
 1. Improved distance prediction feature
 
