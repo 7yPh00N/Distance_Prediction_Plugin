@@ -12,7 +12,7 @@
 
 - `/dps` - Open Plugin Settings Menu
 
-- `/distpred` - Enable/Disable Plugin
+- `dp` & `/distpred` - Enable/Disable Plugin
 
 - `/sonar` - Enable/Disable Sonar
 
