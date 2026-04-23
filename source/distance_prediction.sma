@@ -4,16 +4,14 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.3.3"
+new const PLUGIN_VERSION[] = "1.3.4"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
-
 new const g_ColorNames[8][] = { "Yellow", "Orange", "Red", "Green", "Blue", "Cyan", "Pink", "White" }
 new const g_ColorNamesCN[8][] = { "黄色", "橙色", "红色", "绿色", "蓝色", "青色", "粉色", "白色" }
 new const g_ColorValues[8][3] = {
     {255, 255, 0}, {255, 80, 0}, {255, 20, 20}, {20, 255, 20},
     {20, 20, 255}, {20, 255, 150}, {255, 70, 120}, {255, 255, 255}
 }
-
 new bool:g_Enabled[33]
 new bool:g_ShowRealTime[33]
 new bool:g_ShowBest[33]
@@ -67,7 +65,6 @@ new Float:g_LadderOrigin[33][3]
 new Float:g_LadderVelocity[33][3]
 new bool:g_LDJFirstFrameUsed[33]
 new bool:g_PendingLandingDisplay[33]
-
 new g_ServerType = 1
 new g_MenuLanguage = 1
 new g_BestHudChannel = 4
@@ -115,10 +112,10 @@ public plugin_init()
     register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR)
     register_forward(FM_PlayerPreThink, "fw_PlayerPreThink")
     g_Gravity = get_cvar_float("sv_gravity")
-   
+  
     LoadServerConfig()
     LoadThresholds()
-   
+  
     // 从ini文件中加载默认设置，并初始化到所有玩家
     LoadSettings(0)
     register_clcmd("say /dps", "cmd_predmenu")
@@ -138,6 +135,7 @@ public plugin_init()
     register_clcmd("say /bestpredhud", "cmd_toggle_best")
     register_clcmd("say /landingpred", "cmd_toggle_landing")
     register_clcmd("say /distpred", "cmd_toggle_enabled")
+    register_clcmd("say /dp", "cmd_toggle_enabled")
     register_clcmd("say /sonar", "cmd_toggle_sonar")
     register_menucmd(register_menuid(MENU_MAIN), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_predmenu")
     register_menucmd(register_menuid(MENU_JUMPTYPE), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<9), "handle_jumptype")
@@ -145,6 +143,9 @@ public plugin_init()
     register_menucmd(register_menuid(MENU_REALTIME_Y), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_realtime_y")
     register_menucmd(register_menuid(MENU_STATS_POS), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_stats_pos")
     register_menucmd(register_menuid(MENU_LANDING), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<9), "handle_landingmenu")
+
+    if (g_ServerType == 2)
+        set_task(10.0, "AdTask", 0, _, _, "b")
 }
 
 stock UpdateCurrentThresholds(id)
@@ -272,7 +273,7 @@ public client_connect(id)
 {
     // 为新玩家设置默认值
     LoadSettings(id)
-   
+  
     g_JumpActive[id] = false
     g_StatsDisplayed[id] = false
     g_StrafeCount[id] = 0
@@ -306,7 +307,7 @@ public client_connect(id)
     g_PendingLandingDisplay[id] = false
     for(new i = 0; i < 32; i++)
         g_StrafeMaxDistance[id][i] = 0.0
-       
+      
     UpdateCurrentThresholds(id)
 }
 
@@ -528,7 +529,7 @@ stock show_colormenu(id, target)
             is_current = (i == g_SuccessRectIndex[id])
         else if (target == 2)
             is_current = (i == g_FailRectIndex[id])
-  
+ 
         if (g_MenuLanguage == 1)
             formatex(text, charsmax(text), "%s\r%d. \w%s (%d,%d,%d)%s^n",
                      text, i+1, g_ColorNames[i],
@@ -573,7 +574,7 @@ public handle_colormenu(id, key)
             g_SuccessRectIndex[id] = key
         else if (g_ColorTarget[id] == 2)
             g_FailRectIndex[id] = key
-  
+ 
         show_colormenu(id, g_ColorTarget[id])
     }
     else if (key == 8)
@@ -784,7 +785,7 @@ stock LoadServerConfig()
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction_server.ini", configsdir)
-   
+  
     if (!file_exists(szFile))
     {
         new fp = fopen(szFile, "wt")
@@ -800,7 +801,7 @@ stock LoadServerConfig()
         g_BestHudChannel = 4
         return
     }
-   
+  
     new data[128], len, line = 0
     while (read_file(szFile, line, data, charsmax(data), len))
     {
@@ -816,7 +817,7 @@ stock LoadServerConfig()
             g_BestHudChannel = str_to_num(arg)
         line++
     }
-   
+  
     if (g_ServerType < 1 || g_ServerType > 2) g_ServerType = 1
     if (g_MenuLanguage < 1 || g_MenuLanguage > 2) g_MenuLanguage = 1
     if (g_BestHudChannel < 1 || g_BestHudChannel > 5) g_BestHudChannel = 4
@@ -828,14 +829,14 @@ stock LoadThresholds()
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction_thresholds.ini", configsdir)
-   
+  
     if (!file_exists(szFile))
     {
         // 如果distance_prediction_thresholds.ini不存在
         SaveThresholds()
         return
     }
-   
+  
     new data[128], len
     new line = 0
     while (read_file(szFile, line, data, charsmax(data), len))
@@ -934,7 +935,7 @@ stock SaveThresholds()
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
     new szFile[128]
     formatex(szFile, charsmax(szFile), "%s/distance_prediction_thresholds.ini", configsdir)
-   
+  
     new fp = fopen(szFile, "wt")
     if (fp)
     {
@@ -987,7 +988,7 @@ stock LoadSettings(id=0)
             }
         }
     }
-   
+  
     // 临时变量存储从文件读取的值
     new bool:temp_Enabled = true
     new bool:temp_ShowRealTime = true
@@ -1002,10 +1003,10 @@ stock LoadSettings(id=0)
     new bool:temp_LandingEnabled = true
     new temp_SuccessRectIndex = 6
     new temp_FailRectIndex = 5
-   
+  
     if (!file_exists(szFile))
     {
-        // 如果文件不存在，则保存默认设置（仅在单机生效）
+        // 如果文件不存在，则保存默认设置（仅在单机中生效）
         if (g_ServerType == 1 || id == 0)
             SaveSettings(0)
         // 应用默认值
@@ -1021,7 +1022,7 @@ stock LoadSettings(id=0)
         }
         return
     }
-   
+  
     new data[128], len
     if (read_file(szFile, 0, data, charsmax(data), len))
     {
@@ -1040,7 +1041,7 @@ stock LoadSettings(id=0)
             return
         }
     }
-   
+  
     new line = 0
     while (read_file(szFile, line, data, charsmax(data), len))
     {
@@ -1143,18 +1144,18 @@ stock LoadSettings(id=0)
 
 stock SaveSettings(id=0)
 {
-    // 服务器禁止玩家保存设置
+    // 公共服务器禁止玩家保存设置
     if (g_ServerType == 2 && id != 0)
     {
         client_print_color(id, id, "^4[7yPh00N]^1 插件暂时不支持保存 ^3服务器设置");
         return;
     }
-   
+  
     new configsdir[64]
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
     new szFile[128]
     new authid[32] = ""
-   
+  
     if (id == 0)
     {
         formatex(szFile, charsmax(szFile), "%s/distance_prediction.ini", configsdir)
@@ -1175,7 +1176,7 @@ stock SaveSettings(id=0)
             // 特殊情况
             useId = -1
         }
-       
+      
         fprintf(fp, "// distance_prediction.ini^n")
         fprintf(fp, "^n")
         fprintf(fp, "// General Settings^n")
@@ -1197,7 +1198,6 @@ stock SaveSettings(id=0)
         fprintf(fp, "landingpred_color_fail %d %d %d^n", g_ColorValues[(useId != -1) ? g_FailRectIndex[useId] : 5][0], g_ColorValues[(useId != -1) ? g_FailRectIndex[useId] : 5][1], g_ColorValues[(useId != -1) ? g_FailRectIndex[useId] : 5][2])
         fprintf(fp, "^n")
         fclose(fp)
- 
         if (id != 0)
         {
             new saved_name[64]
@@ -1214,7 +1214,6 @@ stock SaveSettings(id=0)
             client_print_color(id, print_team_red, "^3[7yPh00N] Save Failed!!")
     }
 }
-
 // Strafe判定
 stock Float:GetMoveAngle(id)
 {
@@ -1250,17 +1249,13 @@ stock Float:GetGroundZInRectangle(id, Float:origin[3])
         start[0] = origin[0] + offsets[i][0]
         start[1] = origin[1] + offsets[i][1]
         start[2] = origin[2] + 1.0
- 
         end[0] = start[0]
         end[1] = start[1]
         end[2] = start[2] - 100.0
- 
         new tr = create_tr2()
         engfunc(EngFunc_TraceLine, start, end, 1, id, tr)
- 
         new Float:frac
         get_tr2(tr, 4, frac)
- 
         if (frac < 1.0)
         {
             new Float:hit[3]
@@ -1286,17 +1281,13 @@ stock bool:CheckGroundMatch(id, Float:predX, Float:predY, Float:targetZ)
         start[0] = predX + offsets[i][0]
         start[1] = predY + offsets[i][1]
         start[2] = targetZ + 1.0
- 
         end[0] = start[0]
         end[1] = start[1]
         end[2] = start[2] - 100.0
- 
         new tr = create_tr2()
         engfunc(EngFunc_TraceLine, start, end, 1, id, tr)
- 
         new Float:frac
         get_tr2(tr, 4, frac)
- 
         if (frac < 1.0)
         {
             new Float:hit[3]
@@ -1359,7 +1350,7 @@ stock StartJump(id, bool:ducking)
     g_CurrentStrafeAngle[id] = -1.0
     for(new i = 0; i < 32; i++)
         g_StrafeMaxDistance[id][i] = 0.0
-   
+  
     g_ThresholdReached[id] = 0
     g_FlashFrames[id] = 0
 }
@@ -1387,7 +1378,7 @@ public fw_PlayerPreThink(id)
         g_TakeoffFuser2[id] = 0.0;
         return FMRES_IGNORED
     }
-   
+  
     // 延迟显示HUD（避免溢出）
     if (g_PendingLandingDisplay[id])
     {
@@ -1398,7 +1389,7 @@ public fw_PlayerPreThink(id)
         }
         g_PendingLandingDisplay[id] = false;
     }
-   
+  
     new Float:currOrigin[3]
     pev(id, pev_origin, currOrigin)
     if (g_PrevOrigin[id][0] != 0.0 || g_PrevOrigin[id][1] != 0.0 || g_PrevOrigin[id][2] != 0.0)
@@ -1427,7 +1418,7 @@ public fw_PlayerPreThink(id)
     {
         new bool:isLJ = (g_JumpTypeIndex[id] <= 3);
         new bool:ducking = !!(pev(id, pev_flags) & FL_DUCKING)
-   
+  
         if (isLJ)
         {
             StartJump(id, ducking);
@@ -1516,7 +1507,7 @@ public fw_PlayerPreThink(id)
         // 如果在跳跃过程中检测到onground状态，提前结束预测
         if (onGround && !g_JumpFirstFrame[id])
         {
-            g_PendingLandingDisplay[id] = true;  // 延迟1帧显示（防止与其他插件冲突导致溢出）
+            g_PendingLandingDisplay[id] = true; // 延迟1帧显示（防止与其他插件冲突导致溢出）
             g_JumpActive[id] = false;
             g_PreJumpActive[id] = false;
             g_PreJumpTime[id] = 0.0;
@@ -1550,7 +1541,7 @@ public fw_PlayerPreThink(id)
         new Float:horiz_vel_y = velocity[1];
         if (g_JumpFirstFrame[id])
         {
-            if (g_JumpTypeIndex[id] == 6)  // LDJ使用玩家在梯子上的最后一帧速度
+            if (g_JumpTypeIndex[id] == 6) // LDJ使用玩家在梯子上的最后一帧速度
             {
                 vz_for_calc = g_LadderVelocity[id][2];
                 horiz_vel_x = g_LadderVelocity[id][0];
@@ -1575,10 +1566,10 @@ public fw_PlayerPreThink(id)
         new Float:dx = predX - g_JumpStartOrigin[id][0]
         new Float:dy = predY - g_JumpStartOrigin[id][1]
         new Float:totalDistance = floatsqroot(dx*dx + dy*dy)
-        // LDJ不加32，其他跳跃类型加32
+        // LDJ不需要加32，其他跳跃类型加32
         if (g_JumpTypeIndex[id] != 6)
             totalDistance += 32.0
-        // LDJ第一帧直接显示初始预测结果
+        // LDJ第1帧直接显示初始预测结果
         if (g_JumpTypeIndex[id] == 6 && !g_LDJFirstFrameUsed[id])
         {
             totalDistance = g_InitialPredicted[id];
@@ -1600,9 +1591,12 @@ public fw_PlayerPreThink(id)
                 {
                     set_dhudmessage(g_HudR[id], g_HudG[id], g_HudB[id], -1.0, g_RealTimeY[id], 0, 0.0, g_RealTimeHoldTime[id], 0.0, 0.0);
                 }
-                show_dhudmessage(id, "%.2f", totalDistance)
+                new observers[33], obs_count = 0
+                GetObservers(id, observers, obs_count)
+                for (new k = 0; k < obs_count; k++)
+                    show_dhudmessage(observers[k], "%.2f", totalDistance)
             }
-    
+   
             if (g_LandingEnabled[id])
             {
                 g_UseUpperRect[id] = CheckGroundMatch(id, predX, predY, g_GroundZ[id])
@@ -1617,14 +1611,14 @@ public fw_PlayerPreThink(id)
                         if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[id][i])
                         {
                             g_ThresholdReached[id] |= (1 << i);
-                            emit_sound(id, CHAN_AUTO, "7yPh00N/blip1.wav", 1.0, ATTN_NORM, 0, PITCH_NORM);
+                            PlayPrivateSound(id);
                             g_FlashFrames[id] = 3;
                         }
                     }
                 }
-           
+          
                 new Float:currAngle = GetMoveAngle(id)
-        
+       
                 if (currAngle >= 0.0)
                 {
                     if (g_CurrentStrafeAngle[id] < 0.0)
@@ -1638,7 +1632,7 @@ public fw_PlayerPreThink(id)
                     {
                         new Float:diff = floatabs(currAngle - g_CurrentStrafeAngle[id])
                         if (diff > 180.0) diff = 360.0 - diff
-                
+               
                         if (diff > 45.0)
                         {
                             g_StrafeCount[id]++
@@ -1669,23 +1663,34 @@ public fw_PlayerPreThink(id)
 
 stock clear_strafe_stats(id)
 {
-    set_hudmessage(0, 0, 0, -1.0, 0.25, 0, 0.0, 0.0, 0.0, 0.0, g_BestHudChannel)
-    show_hudmessage(id, "")
+    new observers[33], obs_count = 0
+    GetObservers(id, observers, obs_count)
+    for (new k = 0; k < obs_count; k++)
+    {
+        set_hudmessage(0, 0, 0, -1.0, 0.25, 0, 0.0, 0.0, 0.0, 0.0, g_BestHudChannel)
+        show_hudmessage(observers[k], "")
+    }
 }
 
 stock show_strafe_stats(id)
 {
     new text[1024]
-    // 如果没有记录任何strafe但存在初始预测距离，则显示初始预测距离
+    // 如果没有记录任何strafe但存在初始预测距离，则直接显示初始预测距离
     if (g_StrafeCount[id] == 0 && g_InitialPredicted[id] > 0.0)
     {
         format(text, charsmax(text), "Best Predicted Distance:^nInitial: %.1f^n", g_InitialPredicted[id])
         if (g_ShowBest[id])
         {
             set_hudmessage(g_HudR[id], g_HudG[id], g_HudB[id], g_StatsX[id], g_StatsY[id], 0, 0.0, 999999.0, 0.0, 0.0, g_BestHudChannel)
-            show_hudmessage(id, text)
+            new observers[33], obs_count = 0
+            GetObservers(id, observers, obs_count)
+            for (new k = 0; k < obs_count; k++)
+                show_hudmessage(observers[k], text)
         }
-        client_print(id, print_console, "Best Predicted Distance:^nInitial: %.3f", g_InitialPredicted[id])
+        new observers[33], obs_count = 0
+        GetObservers(id, observers, obs_count)
+        for (new k = 0; k < obs_count; k++)
+            client_print(observers[k], print_console, "Best Predicted Distance:^nInitial: %.3f", g_InitialPredicted[id])
         return
     }
     if (g_StrafeCount[id] <= 0)
@@ -1702,16 +1707,24 @@ stock show_strafe_stats(id)
     if (g_ShowBest[id])
     {
         set_hudmessage(g_HudR[id], g_HudG[id], g_HudB[id], g_StatsX[id], g_StatsY[id], 0, 0.0, 999999.0, 0.0, 0.0, g_BestHudChannel)
-        show_hudmessage(id, text)
+        new observers[33], obs_count = 0
+        GetObservers(id, observers, obs_count)
+        for (new k = 0; k < obs_count; k++)
+            show_hudmessage(observers[k], text)
     }
-    client_print(id, print_console, "Best Predicted Distance:")
-    for(new i = 1; i <= g_StrafeCount[id]; i++)
+    new observers[33], obs_count = 0
+    GetObservers(id, observers, obs_count)
+    for (new k = 0; k < obs_count; k++)
     {
-        new Float:this_max = g_StrafeMaxDistance[id][i]
-        new Float:delta = (i == 1) ? (this_max - g_InitialPredicted[id]) : (this_max - g_StrafeMaxDistance[id][i-1])
-        new sign_char = (delta >= 0.0) ? '+' : '-'
-        new Float:abs_delta = floatabs(delta)
-        client_print(id, print_console, "Strafe %02d: %.3f (%c%.3f)", i, this_max, sign_char, abs_delta)
+        client_print(observers[k], print_console, "Best Predicted Distance:")
+        for(new i = 1; i <= g_StrafeCount[id]; i++)
+        {
+            new Float:this_max = g_StrafeMaxDistance[id][i]
+            new Float:delta = (i == 1) ? (this_max - g_InitialPredicted[id]) : (this_max - g_StrafeMaxDistance[id][i-1])
+            new sign_char = (delta >= 0.0) ? '+' : '-'
+            new Float:abs_delta = floatabs(delta)
+            client_print(observers[k], print_console, "Strafe %02d: %.3f (%c%.3f)", i, this_max, sign_char, abs_delta)
+        }
     }
 }
 
@@ -1735,26 +1748,31 @@ stock DrawPredictionRect(id, Float:predX, Float:predY, Float:predZ, bool:useUppe
 
 stock DrawBeamLine(id, Float:start[3], Float:end[3], r, g, b)
 {
-    message_begin(MSG_ONE_UNRELIABLE, SVC_TEMPENTITY, _, id)
-    write_byte(TE_BEAMPOINTS)
-    engfunc(EngFunc_WriteCoord, start[0])
-    engfunc(EngFunc_WriteCoord, start[1])
-    engfunc(EngFunc_WriteCoord, start[2])
-    engfunc(EngFunc_WriteCoord, end[0])
-    engfunc(EngFunc_WriteCoord, end[1])
-    engfunc(EngFunc_WriteCoord, end[2])
-    write_short(g_BeamSprite)
-    write_byte(0)
-    write_byte(0)
-    write_byte(1)
-    write_byte(3)
-    write_byte(0)
-    write_byte(r)
-    write_byte(g)
-    write_byte(b)
-    write_byte(255)
-    write_byte(0)
-    message_end()
+    new observers[33], obs_count = 0
+    GetObservers(id, observers, obs_count)
+    for (new k = 0; k < obs_count; k++)
+    {
+        message_begin(MSG_ONE_UNRELIABLE, SVC_TEMPENTITY, _, observers[k])
+        write_byte(TE_BEAMPOINTS)
+        engfunc(EngFunc_WriteCoord, start[0])
+        engfunc(EngFunc_WriteCoord, start[1])
+        engfunc(EngFunc_WriteCoord, start[2])
+        engfunc(EngFunc_WriteCoord, end[0])
+        engfunc(EngFunc_WriteCoord, end[1])
+        engfunc(EngFunc_WriteCoord, end[2])
+        write_short(g_BeamSprite)
+        write_byte(0)
+        write_byte(0)
+        write_byte(1)
+        write_byte(3)
+        write_byte(0)
+        write_byte(r)
+        write_byte(g)
+        write_byte(b)
+        write_byte(255)
+        write_byte(0)
+        message_end()
+    }
 }
 
 stock ApplySettingsToPlayer(id, bool:enabled, bool:showReal, bool:showBest, bool:sonar, jumpType,
@@ -1775,4 +1793,40 @@ stock ApplySettingsToPlayer(id, bool:enabled, bool:showReal, bool:showBest, bool
     g_LandingEnabled[id] = landing
     g_SuccessRectIndex[id] = succIdx
     g_FailRectIndex[id] = failIdx
+}
+
+stock GetObservers(jumper, observers[], &count)
+{
+    count = 0
+    if (is_user_connected(jumper))
+        observers[count++] = jumper
+    for (new i = 1; i <= 32; i++)
+    {
+        if (i == jumper || !is_user_connected(i) || is_user_alive(i))
+            continue
+        if (pev(i, pev_iuser2) == jumper)
+            observers[count++] = i
+    }
+}
+
+stock PlayPrivateSound(jumper)
+{
+    new observers[33], obs_count = 0
+    GetObservers(jumper, observers, obs_count)
+    for (new k = 0; k < obs_count; k++)
+        client_cmd(observers[k], "spk \7yPh00N/blip1.wav")
+}
+
+public AdTask()
+{
+    static bool:toggle = false
+    new msg[128]
+    if (!toggle)
+        formatex(msg, charsmax(msg), "^4[7yPh00N]^1 聊天框^3 (按Y)^1 输入^3 /dp^1 开启/关闭^3 跳跃距离实时预测插件")
+    else
+        formatex(msg, charsmax(msg), "^4[7yPh00N]^1 聊天框^3 (按Y)^1 输入^3 /dps^1 开启^3 跳跃距离预测插件设置菜单")
+    toggle = !toggle
+    for (new i = 1; i <= 32; i++)
+        if (is_user_connected(i))
+            client_print_color(i, i, msg)
 }
