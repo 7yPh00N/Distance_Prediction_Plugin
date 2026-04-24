@@ -4,8 +4,11 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.3.4"
+new const PLUGIN_VERSION[] = "1.3.5"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
+// new const Float:LJ_JUMP_TIME = 0.73227289328465705598
+// new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
+// new const Float:BJ_JUMP_TIME = 0.65389425396792266731 // kz_longjumps2
 new const g_ColorNames[8][] = { "Yellow", "Orange", "Red", "Green", "Blue", "Cyan", "Pink", "White" }
 new const g_ColorNamesCN[8][] = { "黄色", "橙色", "红色", "绿色", "蓝色", "青色", "粉色", "白色" }
 new const g_ColorValues[8][3] = {
@@ -74,7 +77,7 @@ stock Float:CalcTimeToLand(Float:z0, Float:vz0, Float:targetZ, Float:grav)
     if (grav <= 0.0)
         return 0.0
     // SBJ & SCJ (FOG1)
-    if (floatabs(z0 - targetZ) < 0.001)
+    if (z0 == targetZ)
     {
         if (vz0 <= 0.0)
             return 0.0
@@ -91,11 +94,10 @@ stock Float:CalcTimeToLand(Float:z0, Float:vz0, Float:targetZ, Float:grav)
     new Float:t1 = (-b + sqrtD) / (2.0 * a)
     new Float:t2 = (-b - sqrtD) / (2.0 * a)
     // 排除0解，取非0解正根
-    const Float:EPS = 0.0001
     new Float:result = 0.0
-    if (t1 > EPS)
+    if (t1 > 0.0)
         result = t1
-    if (t2 > EPS && (result == 0.0 || t2 < result))
+    if (t2 > 0.0 && (result == 0.0 || t2 < result))
         result = t2
     return result
 }
@@ -145,7 +147,7 @@ public plugin_init()
     register_menucmd(register_menuid(MENU_LANDING), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<9), "handle_landingmenu")
 
     if (g_ServerType == 2)
-        set_task(10.0, "AdTask", 0, _, _, "b")
+        set_task(10.0, "AdTask", 0, _, _, "b")  // 公共服务器每10秒发一条插件提示
 }
 
 stock UpdateCurrentThresholds(id)
