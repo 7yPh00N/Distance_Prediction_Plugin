@@ -48,7 +48,7 @@
 
 1. Improved distance prediction feature
 
-- Introduced vertical velocity & gravitational acceleration to improve calculation accuracy
+- Introduced `vertical velocity` & `gravitational acceleration` to improve calculation accuracy
 
 2. Added support for public servers
 
@@ -56,7 +56,7 @@
 
 - Improved sonar feature
 
-3. Added LDJ (ladder jump)
+3. Added `LDJ` (ladder jump)
 
 4. Fixed some overflow bugs
 
