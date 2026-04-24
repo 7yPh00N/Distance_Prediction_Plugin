@@ -50,9 +50,13 @@
 
 - Introduced `vertical velocity` & `gravitational acceleration` to improve calculation accuracy
 
-2. Added support for public servers (`distance_prediction_server 1`)
+2. Added support for public servers (`distance_prediction_server 2`)
 
 - Added observer pattern
+
+- Added `Chinese` support (`menu_language 2`)
+
+- Added HUD channel customization feature (`hud_best_channel 4`)
 
 - Improved sonar feature
 
