@@ -44,15 +44,21 @@
 
 ## V1.4.0 (Coming Soon)
 
-### 2026.04.xx
+### 2026.04.25
 
 1. Improved distance prediction feature
 
 - Introduced vertical velocity & gravitational acceleration to improve calculation accuracy
-  
-2. Added LDJ (ladder jump)
 
-3. Fixed some bugs
+2. Added support for public servers
+
+- Added observer pattern
+
+- Improved sonar feature
+
+3. Added LDJ (ladder jump)
+
+4. Fixed some overflow bugs
 
 ## V1.3.0
 
