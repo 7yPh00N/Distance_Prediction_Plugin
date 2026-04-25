@@ -82,7 +82,7 @@
 
 2. Added 13 new plugin commands
 
-3. Refactored config file read/write methods
+3. Refactored config file `I`/`O` methods
 
 ## V1.2.0
 
