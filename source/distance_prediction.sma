@@ -4,7 +4,7 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.3.5"
+new const PLUGIN_VERSION[] = "1.4.0"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 // new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 // new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
@@ -146,8 +146,8 @@ public plugin_init()
     register_menucmd(register_menuid(MENU_STATS_POS), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_stats_pos")
     register_menucmd(register_menuid(MENU_LANDING), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<9), "handle_landingmenu")
 
-    if (g_ServerType == 2)
-        set_task(10.0, "AdTask", 0, _, _, "b")  // 公共服务器每10秒发一条插件提示
+    // if (g_ServerType == 2)
+        // set_task(10.0, "AdTask", 0, _, _, "b")  // 公共服务器每10秒发一条插件提示
 }
 
 stock UpdateCurrentThresholds(id)
