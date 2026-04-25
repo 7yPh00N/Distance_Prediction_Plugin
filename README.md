@@ -62,7 +62,7 @@
 
 2. Added support for public servers (`distance_prediction_server 2`)
 
-- Added observer pattern
+- Added observer pattern support
 
 - Added `Chinese` support (`menu_language 2`)
 
