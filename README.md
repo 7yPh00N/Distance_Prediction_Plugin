@@ -52,7 +52,7 @@
 
 # Changelog
 
-## V1.4.0 (Coming Soon)
+## V1.4.0
 
 ### 2026.04.25
 
