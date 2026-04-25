@@ -42,7 +42,7 @@
 
 # Configs
 
-Path - `\cstrike\addons\amxmodx\configs`
+## \cstrike\addons\amxmodx\configs
 
 - `distance_prediction.ini`
 
