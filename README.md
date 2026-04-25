@@ -40,6 +40,16 @@
 
 - `/ldjpred` - Ladder Jump
 
+# Configs
+
+`\cstrike\addons\amxmodx\configs`
+
+- `distance_prediction.ini`
+
+- `distance_prediction_server.ini`
+
+- `distance_prediction_thresholds.ini`
+
 # Changelog
 
 ## V1.4.0 (Coming Soon)
