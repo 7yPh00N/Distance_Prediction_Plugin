@@ -1580,6 +1580,21 @@ public fw_PlayerPreThink(id)
         g_PredX[id] = predX
         g_PredY[id] = predY
         g_PredZ[id] = g_GroundZ[id]
+
+        // 阈值检查（必须在DHUD显示之前，以确保当前帧颜色正确）
+        if (!onGround && remaining > 0.0)
+        {
+            for (new i = 0; i < g_CurrentThresholdCount[id]; i++)
+            {
+                if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[id][i])
+                {
+                    g_ThresholdReached[id] |= (1 << i);
+                    PlayPrivateSound(id);
+                    g_FlashFrames[id] = 3;
+                }
+            }
+        }
+
         if (remaining > 0.0)
         {
             if (g_ShowRealTime[id])
@@ -1606,19 +1621,6 @@ public fw_PlayerPreThink(id)
             }
             if (!onGround)
             {
-                if (g_SonarEnabled[id])
-                {
-                    for (new i = 0; i < g_CurrentThresholdCount[id]; i++)
-                    {
-                        if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[id][i])
-                        {
-                            g_ThresholdReached[id] |= (1 << i);
-                            PlayPrivateSound(id);
-                            g_FlashFrames[id] = 3;
-                        }
-                    }
-                }
-          
                 new Float:currAngle = GetMoveAngle(id)
        
                 if (currAngle >= 0.0)
