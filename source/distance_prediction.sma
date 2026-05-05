@@ -4,7 +4,7 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.4.2"
+new const PLUGIN_VERSION[] = "1.4.3"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 // new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 // new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
@@ -280,7 +280,7 @@ public cmd_toggle_speed(id)
 {
     if (!is_user_connected(id)) return PLUGIN_HANDLED;
     g_SpeedDisplayEnabled[id] = !g_SpeedDisplayEnabled[id];
-    client_print_color(id, id, "^4[7yPh00N]^1 Speed Display: %s", g_SpeedDisplayEnabled[id] ? "^3ON" : "^3OFF");
+    client_print_color(id, id, "^4[7yPh00N]^1 Speed: %s", g_SpeedDisplayEnabled[id] ? "^3ON" : "^3OFF");
     SaveSettings(id);
     return PLUGIN_HANDLED;
 }
@@ -1713,7 +1713,7 @@ public fw_PlayerPreThink(id)
         }
         
         new speed_text[32]
-        if (g_InPrediction[id])
+        if (g_InPrediction[id] && !g_JumpFirstFrame[id])
         {
             new Float:gain = currHorizontalSpeed - g_TakeoffHorizontalSpeed[id]
             if (gain >= 0.0)
