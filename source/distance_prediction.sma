@@ -4,7 +4,7 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.4.3"
+new const PLUGIN_VERSION[] = "1.4.4"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 // new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 // new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
@@ -71,7 +71,6 @@ new bool:g_PendingLandingDisplay[33]
 new g_ServerType = 1
 new g_MenuLanguage = 1
 new g_BestHudChannel = 4
-new bool:g_SpeedDisplayEnabled[33]
 new Float:g_PrevHorizontalSpeed[33]
 new Float:g_TakeoffHorizontalSpeed[33]
 new bool:g_InPrediction[33]
@@ -143,7 +142,6 @@ public plugin_init()
     register_clcmd("say /distpred", "cmd_toggle_enabled")
     register_clcmd("say /dp", "cmd_toggle_enabled")
     register_clcmd("say /sonar", "cmd_toggle_sonar")
-    register_clcmd("say /dpspeed", "cmd_toggle_speed")
     register_menucmd(register_menuid(MENU_MAIN), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_predmenu")
     register_menucmd(register_menuid(MENU_JUMPTYPE), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<9), "handle_jumptype")
     register_menucmd(register_menuid(MENU_COLOR), (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), "handle_colormenu")
@@ -276,15 +274,6 @@ public cmd_toggle_sonar(id)
     return PLUGIN_HANDLED;
 }
 
-public cmd_toggle_speed(id)
-{
-    if (!is_user_connected(id)) return PLUGIN_HANDLED;
-    g_SpeedDisplayEnabled[id] = !g_SpeedDisplayEnabled[id];
-    client_print_color(id, id, "^4[7yPh00N]^1 Speed: %s", g_SpeedDisplayEnabled[id] ? "^3ON" : "^3OFF");
-    SaveSettings(id);
-    return PLUGIN_HANDLED;
-}
-
 public client_connect(id)
 {
     // 为新玩家设置默认值
@@ -321,7 +310,6 @@ public client_connect(id)
     g_LadderVelocity[id][2] = 0.0
     g_LDJFirstFrameUsed[id] = false
     g_PendingLandingDisplay[id] = false
-    g_SpeedDisplayEnabled[id] = true
     g_PrevHorizontalSpeed[id] = 0.0
     g_TakeoffHorizontalSpeed[id] = 0.0
     g_InPrediction[id] = false
@@ -429,7 +417,7 @@ public handle_predmenu(id, key)
         case 5: show_stats_pos_menu(id)
         case 6: show_landingmenu(id)
         case 7: { SaveSettings(id); show_predmenu(id); }
-        case 9: return
+        case 8: return
     }
 }
 
@@ -1234,6 +1222,7 @@ stock SaveSettings(id=0)
             client_print_color(id, print_team_red, "^3[7yPh00N] Save Failed!!")
     }
 }
+
 // Strafe判定
 stock Float:GetMoveAngle(id)
 {
@@ -1415,7 +1404,6 @@ public fw_PlayerPreThink(id)
     pev(id, pev_origin, currOrigin)
     new Float:velocity[3]
     pev(id, pev_velocity, velocity)
-    new Float:currHorizontalSpeed = floatsqroot(velocity[0]*velocity[0] + velocity[1]*velocity[1])
     g_InPrediction[id] = false
     
     if (g_PrevOrigin[id][0] != 0.0 || g_PrevOrigin[id][1] != 0.0 || g_PrevOrigin[id][2] != 0.0)
@@ -1613,7 +1601,8 @@ public fw_PlayerPreThink(id)
                 if (!(g_ThresholdReached[id] & (1 << i)) && totalDistance >= g_CurrentThresholds[id][i])
                 {
                     g_ThresholdReached[id] |= (1 << i);
-                    PlayPrivateSound(id);
+                    if (g_SonarEnabled[id])
+                        PlayPrivateSound(id);
                     g_FlashFrames[id] = 3;
                 }
             }
@@ -1687,52 +1676,6 @@ public fw_PlayerPreThink(id)
             g_TakeoffFuser2[id] = 0.0;
             g_LDJFirstFrameUsed[id] = false;
         }
-    }
-    
-    if (g_SpeedDisplayEnabled[id])
-    {
-        new speed_r, speed_g, speed_b
-        new Float:speedDiff = currHorizontalSpeed - g_PrevHorizontalSpeed[id]
-        if (speedDiff > 0.01)
-        {
-            speed_r = 20
-            speed_g = 255
-            speed_b = 150
-        }
-        else if (speedDiff < -0.01)
-        {
-            speed_r = 255
-            speed_g = 70
-            speed_b = 120
-        }
-        else
-        {
-            speed_r = 255
-            speed_g = 255
-            speed_b = 255
-        }
-        
-        new speed_text[32]
-        if (g_InPrediction[id] && !g_JumpFirstFrame[id])
-        {
-            new Float:gain = currHorizontalSpeed - g_TakeoffHorizontalSpeed[id]
-            if (gain >= 0.0)
-                formatex(speed_text, charsmax(speed_text), "%.2f^n(+%.2f)", currHorizontalSpeed, gain)
-            else
-                formatex(speed_text, charsmax(speed_text), "%.2f^n(%.2f)", currHorizontalSpeed, gain)
-        }
-        else
-        {
-            formatex(speed_text, charsmax(speed_text), "%.2f", currHorizontalSpeed)
-        }
-        
-        set_dhudmessage(speed_r, speed_g, speed_b, -1.0, 0.65, 0, 0.0, 0.011, 0.0, 0.0)
-        new observers[33], obs_count = 0
-        GetObservers(id, observers, obs_count)
-        for (new k = 0; k < obs_count; k++)
-            show_dhudmessage(observers[k], speed_text)
-        
-        g_PrevHorizontalSpeed[id] = currHorizontalSpeed
     }
     
     return FMRES_IGNORED
