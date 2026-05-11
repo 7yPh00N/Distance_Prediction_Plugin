@@ -51,7 +51,7 @@
 - `distance_prediction_thresholds.ini`
 
 # Changelog
-
+## V1.5.0
 ## V1.4.0
 
 ### 2026.04.25
