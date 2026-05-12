@@ -4,7 +4,7 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.4.5"
+new const PLUGIN_VERSION[] = "1.4.6"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 // new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 // new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
@@ -1593,7 +1593,7 @@ public fw_PlayerPreThink(id)
         g_PredY[id] = predY
         g_PredZ[id] = g_GroundZ[id]
 
-        // 阈值检查（必须在DHUD显示之前，以确保当前帧颜色正确）
+        // 阈值检查（在DHUD刷新之前完成判断）
         if (!onGround && remaining > 0.0)
         {
             for (new i = 0; i < g_CurrentThresholdCount[id]; i++)
@@ -1603,7 +1603,7 @@ public fw_PlayerPreThink(id)
                     g_ThresholdReached[id] |= (1 << i);
                     if (g_SonarEnabled[id])
                         PlayPrivateSound(id);
-                    g_FlashFrames[id] = 3;
+                    g_FlashFrames[id] = 5;
                 }
             }
         }
