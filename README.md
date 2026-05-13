@@ -62,7 +62,7 @@
 
 - Introduced `vertical velocity` & `gravitational acceleration` to improve calculation accuracy
 
-2. Added support for public servers (`distance_prediction_server 2`)
+2. Added support for public servers (`movementhud_server 2`)
 
 - Added observer pattern support
 
