@@ -46,12 +46,14 @@
 
 - `distance_prediction.ini`
 
-- `distance_prediction_server.ini`
-
 - `distance_prediction_thresholds.ini`
+
+- `movementhud_server.ini`
 
 # Changelog
 ## V1.5.0
+### 2026.05.14
+
 ## V1.4.0
 
 ### 2026.04.25
