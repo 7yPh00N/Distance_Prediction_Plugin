@@ -4,7 +4,7 @@
 #define MOVETYPE_FLY 5
 
 new const PLUGIN_NAME[] = "Distance Prediction"
-new const PLUGIN_VERSION[] = "1.4.6"
+new const PLUGIN_VERSION[] = "1.5.0"
 new const PLUGIN_AUTHOR[] = "7yPh00N"
 // new const Float:LJ_JUMP_TIME = 0.73227289328465705598
 // new const Float:SBJ_JUMP_TIME = 0.66085311074049502000 // kz_longjumps2
@@ -71,6 +71,8 @@ new bool:g_PendingLandingDisplay[33]
 new g_ServerType = 1
 new g_MenuLanguage = 1
 new g_BestHudChannel = 4
+new Float:g_DhudHoldTime = 0.011
+new g_DhudFlashTime = 5
 new Float:g_PrevHorizontalSpeed[33]
 new Float:g_TakeoffHorizontalSpeed[33]
 new bool:g_InPrediction[33]
@@ -603,17 +605,17 @@ stock show_realtime_ymenu(id)
         else
             formatex(text, charsmax(text), "%s\r1. \wShow Real-Time Prediction - \rOFF^n^n", text)
         if (floatabs(g_RealTimeY[id] + 1.0) < 0.001)
-            formatex(text, charsmax(text), "%s[Current]: Y = Center^n", text)
+            formatex(text, charsmax(text), "%s[Current]: Y = Center^n^n", text)
         else
-            formatex(text, charsmax(text), "%s[Current]: Y = %.2f^n", text, g_RealTimeY[id])
-        formatex(text, charsmax(text), "%s[Current]: Hold Time = %.3f^n^n", text, g_RealTimeHoldTime[id])
+            formatex(text, charsmax(text), "%s[Current]: Y = %.2f^n^n", text, g_RealTimeY[id])
+        // formatex(text, charsmax(text), "%s[Current]: Hold Time = %.3f^n^n", text, g_RealTimeHoldTime[id])
         formatex(text, charsmax(text), "%s\r2. \wY - 0.01 (Up)^n", text)
         formatex(text, charsmax(text), "%s\r3. \wY + 0.01 (Down)^n", text)
         formatex(text, charsmax(text), "%s\r4. \yY = Center^n^n", text)
-        formatex(text, charsmax(text), "%s\r5. \wHold Time - 0.001^n", text)
-        formatex(text, charsmax(text), "%s\r6. \wHold Time + 0.001^n", text)
-        formatex(text, charsmax(text), "%s\r7. \yDefault Hold Time^n^n", text)
-        formatex(text, charsmax(text), "%s\r8. \ySave Settings^n^n", text)
+        // formatex(text, charsmax(text), "%s\r5. \wHold Time - 0.001^n", text)
+        // formatex(text, charsmax(text), "%s\r6. \wHold Time + 0.001^n", text)
+        // formatex(text, charsmax(text), "%s\r7. \yDefault Hold Time^n^n", text)
+        formatex(text, charsmax(text), "%s\r5. \ySave Settings^n^n", text)
         formatex(text, charsmax(text), "%s\r0. \wBack", text)
     }
     if (g_MenuLanguage == 2)
@@ -624,17 +626,17 @@ stock show_realtime_ymenu(id)
         else
             formatex(text, charsmax(text), "%s\r1. \w功能状态 - \r已关闭^n^n", text)
         if (floatabs(g_RealTimeY[id] + 1.0) < 0.001)
-            formatex(text, charsmax(text), "%s[当前]: Y = 居中^n", text)
+            formatex(text, charsmax(text), "%s[当前]: Y = 居中^n^n", text)
         else
-            formatex(text, charsmax(text), "%s[当前]: Y = %.2f^n", text, g_RealTimeY[id])
-        formatex(text, charsmax(text), "%s[当前]: 预测文本单帧持续时间 = %.3f^n^n", text, g_RealTimeHoldTime[id])
+            formatex(text, charsmax(text), "%s[当前]: Y = %.2f^n^n", text, g_RealTimeY[id])
+        // formatex(text, charsmax(text), "%s[当前]: 预测文本单帧持续时间 = %.3f^n^n", text, g_RealTimeHoldTime[id])
         formatex(text, charsmax(text), "%s\r2. \wY - 0.01 (向上)^n", text)
         formatex(text, charsmax(text), "%s\r3. \wY + 0.01 (向下)^n", text)
         formatex(text, charsmax(text), "%s\r4. \yY = 居中^n^n", text)
-        formatex(text, charsmax(text), "%s\r5. \w预测文本单帧持续时间 - 0.001^n", text)
-        formatex(text, charsmax(text), "%s\r6. \w预测文本单帧持续时间 + 0.001^n", text)
-        formatex(text, charsmax(text), "%s\r7. \y恢复默认单帧持续时间^n^n", text)
-        formatex(text, charsmax(text), "%s\r8. \y保存设置^n^n", text)
+        // formatex(text, charsmax(text), "%s\r5. \w预测文本单帧持续时间 - 0.001^n", text)
+        // formatex(text, charsmax(text), "%s\r6. \w预测文本单帧持续时间 + 0.001^n", text)
+        // formatex(text, charsmax(text), "%s\r7. \y恢复默认单帧持续时间^n^n", text)
+        formatex(text, charsmax(text), "%s\r5. \y保存设置^n^n", text)
         formatex(text, charsmax(text), "%s\r0. \w返回", text)
     }
     show_menu(id, (1<<0)|(1<<1)|(1<<2)|(1<<3)|(1<<4)|(1<<5)|(1<<6)|(1<<7)|(1<<8)|(1<<9), text, -1, MENU_REALTIME_Y)
@@ -661,20 +663,20 @@ public handle_realtime_y(id, key)
             show_realtime_ymenu(id);
         }
         case 3: { g_RealTimeY[id] = -1.0; show_realtime_ymenu(id); }
-        case 4:
-        {
-            g_RealTimeHoldTime[id] -= 0.001;
-            if (g_RealTimeHoldTime[id] < 0.001) g_RealTimeHoldTime[id] = 0.001;
-            show_realtime_ymenu(id);
-        }
-        case 5:
-        {
-            g_RealTimeHoldTime[id] += 0.001;
-            if (g_RealTimeHoldTime[id] > 5.0) g_RealTimeHoldTime[id] = 5.0;
-            show_realtime_ymenu(id);
-        }
-        case 6: { g_RealTimeHoldTime[id] = 0.011; show_realtime_ymenu(id); }
-        case 7: { SaveSettings(id); show_realtime_ymenu(id); }
+        // case 4:
+        // {
+        //     g_RealTimeHoldTime[id] -= 0.001;
+        //     if (g_RealTimeHoldTime[id] < 0.001) g_RealTimeHoldTime[id] = 0.001;
+        //     show_realtime_ymenu(id);
+        // }
+        // case 5:
+        // {
+        //     g_RealTimeHoldTime[id] += 0.001;
+        //     if (g_RealTimeHoldTime[id] > 5.0) g_RealTimeHoldTime[id] = 5.0;
+        //     show_realtime_ymenu(id);
+        // }
+        // case 6: { g_RealTimeHoldTime[id] = 0.011; show_realtime_ymenu(id); }
+        case 4: { SaveSettings(id); show_realtime_ymenu(id); }
     }
 }
 
@@ -792,21 +794,26 @@ stock LoadServerConfig()
     new configsdir[64]
     get_localinfo("amxx_configsdir", configsdir, charsmax(configsdir))
     new szFile[128]
-    formatex(szFile, charsmax(szFile), "%s/distance_prediction_server.ini", configsdir)
+    formatex(szFile, charsmax(szFile), "%s/movementhud_server.ini", configsdir)
   
     if (!file_exists(szFile))
     {
         new fp = fopen(szFile, "wt")
         if (fp)
         {
-            fprintf(fp, "// 1. LAN Server^n// 2. Public Server^ndistance_prediction_server 1^n^n")
+            fprintf(fp, "// 1. LAN Server^n// 2. Public Server^nmovementhud_server 1^n^n")
             fprintf(fp, "// 1. English^n// 2. Chinese^nmenu_language 1^n^n")
-            fprintf(fp, "// Custom Channel^nhud_best_channel 4^n")
+            fprintf(fp, "// HUD^nhud_best_channel 4^n^n")
+            fprintf(fp, "// DHUD^n")
+            fprintf(fp, "dhud_holdtime 0.011000^n")
+            fprintf(fp, "dhud_flashtime 5^n")
             fclose(fp)
         }
         g_ServerType = 1
         g_MenuLanguage = 1
         g_BestHudChannel = 4
+        g_DhudHoldTime = 0.011
+        g_DhudFlashTime = 5
         return
     }
   
@@ -817,18 +824,24 @@ stock LoadServerConfig()
         if (data[0] == 0 || data[0] == '/') { line++; continue; }
         new key[32], arg[32]
         parse(data, key, charsmax(key), arg, charsmax(arg))
-        if (equal(key, "distance_prediction_server"))
+        if (equal(key, "movementhud_server"))
             g_ServerType = str_to_num(arg)
         else if (equal(key, "menu_language"))
             g_MenuLanguage = str_to_num(arg)
         else if (equal(key, "hud_best_channel"))
             g_BestHudChannel = str_to_num(arg)
+        else if (equal(key, "dhud_holdtime"))
+            g_DhudHoldTime = str_to_float(arg)
+        else if (equal(key, "dhud_flashtime"))
+            g_DhudFlashTime = str_to_num(arg)
         line++
     }
   
     if (g_ServerType < 1 || g_ServerType > 2) g_ServerType = 1
     if (g_MenuLanguage < 1 || g_MenuLanguage > 2) g_MenuLanguage = 1
     if (g_BestHudChannel < 1 || g_BestHudChannel > 5) g_BestHudChannel = 4
+    if (g_DhudHoldTime < 0.001 || g_DhudHoldTime > 5.0) g_DhudHoldTime = 0.011
+    if (g_DhudFlashTime < 1 || g_DhudFlashTime > 20) g_DhudFlashTime = 5
 }
 
 stock LoadThresholds()
@@ -1195,7 +1208,7 @@ stock SaveSettings(id=0)
         fprintf(fp, "// HUD Settings^n")
         fprintf(fp, "hud_color %d %d %d^n", (useId != -1) ? g_HudR[useId] : 255, (useId != -1) ? g_HudG[useId] : 255, (useId != -1) ? g_HudB[useId] : 0)
         fprintf(fp, "hud_realtime_y %.6f^n", (useId != -1) ? g_RealTimeY[useId] : -1.0)
-        fprintf(fp, "hud_realtime_holdtime %.6f^n", (useId != -1) ? g_RealTimeHoldTime[useId] : 0.011)
+        fprintf(fp, "hud_realtime_holdtime %.6f^n", g_DhudHoldTime)
         fprintf(fp, "enable_realtime_hud %d^n", (useId != -1) ? (g_ShowRealTime[useId] ? 1 : 0) : 1)
         fprintf(fp, "hud_best_pos %.6f %.6f^n", (useId != -1) ? g_StatsX[useId] : -1.0, (useId != -1) ? g_StatsY[useId] : 0.25)
         fprintf(fp, "enable_best_hud %d^n", (useId != -1) ? (g_ShowBest[useId] ? 1 : 0) : 1)
@@ -1603,7 +1616,7 @@ public fw_PlayerPreThink(id)
                     g_ThresholdReached[id] |= (1 << i);
                     if (g_SonarEnabled[id])
                         PlayPrivateSound(id);
-                    g_FlashFrames[id] = 5;
+                    g_FlashFrames[id] = g_DhudFlashTime;
                 }
             }
         }
@@ -1618,12 +1631,12 @@ public fw_PlayerPreThink(id)
             {
                 if (g_FlashFrames[id] > 0)
                 {
-                    set_dhudmessage(255, 255, 255, -1.0, g_RealTimeY[id], 0, 0.0, g_RealTimeHoldTime[id], 0.0, 0.0);
+                    set_dhudmessage(255, 255, 255, -1.0, g_RealTimeY[id], 0, 0.0, g_DhudHoldTime, 0.0, 0.0);
                     g_FlashFrames[id]--;
                 }
                 else
                 {
-                    set_dhudmessage(g_HudR[id], g_HudG[id], g_HudB[id], -1.0, g_RealTimeY[id], 0, 0.0, g_RealTimeHoldTime[id], 0.0, 0.0);
+                    set_dhudmessage(g_HudR[id], g_HudG[id], g_HudB[id], -1.0, g_RealTimeY[id], 0, 0.0, g_DhudHoldTime, 0.0, 0.0);
                 }
                 for (new k = 0; k < obs_count; k++)
                     show_dhudmessage(observers[k], "%.2f", totalDistance)
