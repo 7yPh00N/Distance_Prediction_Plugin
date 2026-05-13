@@ -44,11 +44,11 @@
 
 ## \cstrike\addons\amxmodx\configs\
 
+- `movementhud_server.ini`
+
 - `distance_prediction.ini`
 
 - `distance_prediction_thresholds.ini`
-
-- `movementhud_server.ini`
 
 # Changelog
 ## V1.5.0
