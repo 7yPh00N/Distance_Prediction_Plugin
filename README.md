@@ -60,7 +60,7 @@
 
 - Fixed one-frame flash delay
 
-- Always kept flashing enabled
+- Always keep flash feature enabled
   
 - Changed default flash time from `3` to `5` (`dhud_flashtime 5`)
 
