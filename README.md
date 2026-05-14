@@ -58,6 +58,12 @@
 
 1. Improved DHUD
 
+- Fixed one-frame flash delay
+
+- 
+  
+- Removed hold time adjustment feature
+ 
 2. Renamed `distance_prediction_server.ini` to `movementhud_server.ini`
 
 ## V1.4.0
