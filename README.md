@@ -62,6 +62,8 @@
 
 - 
   
+- Changed default flash time from 3 to 5
+
 - Removed hold time adjustment feature
  
 2. Renamed `distance_prediction_server.ini` to `movementhud_server.ini`
