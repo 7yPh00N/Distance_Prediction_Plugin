@@ -51,8 +51,14 @@
 - `distance_prediction_thresholds.ini`
 
 # Changelog
+
 ## V1.5.0
+
 ### 2026.05.14
+
+1. Improved DHUD
+
+2. Renamed `distance_prediction_server.ini` to `movementhud_server.ini`
 
 ## V1.4.0
 
