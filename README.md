@@ -59,8 +59,6 @@
 1. Improved DHUD
 
 - Fixed one-frame flash delay
-
-- Always keep flash feature enabled
   
 - Changed default flash time from `3` to `5` (`dhud_flashtime 5`)
 
